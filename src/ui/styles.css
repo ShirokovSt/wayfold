@@ -368,6 +368,12 @@ button.primary:hover {
   font-size: 14px;
 }
 
+.credits {
+  margin: 18px 0 0;
+  color: #9c8a70;
+  font-size: 12px;
+}
+
 .language select {
   font: inherit;
   color: var(--ink);

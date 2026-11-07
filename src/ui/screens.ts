@@ -1,3 +1,4 @@
+import { version } from '../../package.json'
 import { onLanguageChange, t } from '../i18n'
 import { DIFFICULTIES } from '../ai/rival'
 import type { MatchSettings } from '../game'
@@ -46,6 +47,7 @@ export class Screens {
         element('p', 'tagline', t().tagline),
         element('div', 'menu-buttons', ...buttons),
         languageSelect(),
+        element('p', 'credits', `v${version} · © 2026 Stanislav Shirokov`),
       )
     })
   }
