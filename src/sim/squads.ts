@@ -1,8 +1,8 @@
 import { hexDistance, hexToPoint } from '../core/hex'
 import { findPath } from './pathfind'
-import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, MOVE_COST, SQUAD_SPEED } from './rules'
+import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, MOVE_COST, SOLDIER_STRENGTH, SQUAD_SPEED } from './rules'
 import { claimAround, paint } from './territory'
-import { ensureCapital } from './villages'
+import { ensureCapital, hasForge } from './villages'
 import type { Cell, PlayerId, Squad, Village, World } from './world'
 
 // The one way to give orders, for the player and the AI alike: all the village's people set off
@@ -13,8 +13,12 @@ export function sendSquad(world: World, player: PlayerId, from: Village, to: Cel
   if (count < 1 || !path || path.length < 2) return null
 
   from.population -= count
+  const strength = hasForge(world, from) ? SOLDIER_STRENGTH : 1
   const { x, y } = hexToPoint(from.cell.hex, 1)
-  const squad: Squad = { id: world.nextId++, owner: player, count, path, step: 0, progress: 0, home: from, start: null, x, y, prevX: x, prevY: y }
+  const squad: Squad = {
+    id: world.nextId++, owner: player, count, strength, path, step: 0, progress: 0,
+    home: from, start: null, x, y, prevX: x, prevY: y,
+  }
   world.squads.push(squad)
   return squad
 }
@@ -58,7 +62,7 @@ export function moveSquads(world: World, dt: number): void {
   }
 }
 
-// Enemy squads that meet lose the same number of people: the smaller one is wiped out
+// Enemy squads that meet lose the same strength: the weaker one is wiped out
 export function resolveClashes(world: World): void {
   const squads = world.squads
   for (let i = 0; i < squads.length; i++) {
@@ -67,13 +71,17 @@ export function resolveClashes(world: World): void {
       const b = squads[j]
       if (a.owner === b.owner || a.count === 0 || b.count === 0) continue
       if (Math.hypot(a.x - b.x, a.y - b.y) < CLASH_DISTANCE) {
-        const losses = Math.min(a.count, b.count)
-        a.count -= losses
-        b.count -= losses
+        const losses = Math.min(power(a), power(b))
+        a.count = Math.floor((power(a) - losses) / a.strength)
+        b.count = Math.floor((power(b) - losses) / b.strength)
       }
     }
   }
   world.squads = squads.filter((squad) => squad.count > 0)
+}
+
+function power(squad: Squad): number {
+  return squad.count * squad.strength
 }
 
 function arrive(world: World, squad: Squad): void {
@@ -102,11 +110,12 @@ function enterVillage(world: World, squad: Squad, village: Village): void {
     village.population += squad.count
     return
   }
-  village.population -= squad.count
+  village.population -= power(squad)
   if (village.population < 0) {
     const loser = village.owner
     village.owner = squad.owner
-    village.population = -village.population
+    village.population = -village.population / squad.strength // the survivors move in
+    village.capturedAt = world.time
     village.capital = false // a captured capital becomes an ordinary village
     claimAround(world.map, village, CAPTURE_LAND_RADIUS)
     if (loser !== null) ensureCapital(world, loser, village.cell)

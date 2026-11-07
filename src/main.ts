@@ -6,6 +6,7 @@ import { PointerInput } from './input/pointer'
 import { Renderer } from './render/renderer'
 import { TICK_SECONDS } from './sim/rules'
 import { HUMAN } from './sim/world'
+import { BuildMenu } from './ui/buildMenu'
 import { Hud } from './ui/hud'
 import { Screens } from './ui/screens'
 
@@ -24,8 +25,12 @@ const renderer = new Renderer(canvas, game.world)
 const input = new PointerInput(canvas, renderer.layout, game)
 const screens = new Screens(document.querySelector('#overlay')!)
 const hud = new Hud(document.querySelector('#hud')!, game, { togglePause, newMap, setSpeed })
+const buildMenu = new BuildMenu(document.querySelector('.stage')!, game, renderer.layout)
 const banner = document.querySelector<HTMLElement>('#banner')!
 let endShown = false
+
+input.onPress = () => buildMenu.close()
+input.onTileClick = (cell) => buildMenu.open(cell)
 
 function play(): void {
   game.started = true
@@ -53,6 +58,7 @@ function newMap(): void {
   game.restart(Date.now())
   renderer.setWorld(game.world)
   input.drag = null
+  buildMenu.close()
   endShown = false
   play()
 }
@@ -65,8 +71,12 @@ const showTexts = () => {
 showTexts()
 onLanguageChange(showTexts)
 
-new ResizeObserver(() => renderer.resize()).observe(canvas)
+new ResizeObserver(() => {
+  renderer.resize()
+  buildMenu.close() // it would stay where the tile used to be
+}).observe(canvas)
 window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') buildMenu.close()
   if (event.code !== 'Space') return
   event.preventDefault() // otherwise Space would also press the focused button
   togglePause()
@@ -84,7 +94,13 @@ function frame(now: number): void {
     game.update(TICK_SECONDS)
     pending -= TICK_MS
   }
-  renderer.draw(game.paused ? 1 : pending / TICK_MS, now / 1000, input.drag, game.paused)
+  buildMenu.update()
+  renderer.draw(game.paused ? 1 : pending / TICK_MS, now / 1000, {
+    drag: input.drag,
+    hover: input.hover,
+    selected: buildMenu.cell,
+    showRoutes: game.paused,
+  })
   hud.update()
 
   const winner = game.world.winner

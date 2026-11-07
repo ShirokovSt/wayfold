@@ -15,7 +15,7 @@ export class GameMap {
       this.rowStarts.push(this.cells.length)
       for (let col = 0; col < this.rowLength(row); col++) {
         const hex = { q: col - Math.floor(row / 2), r: row }
-        this.cells.push({ hex, index: this.cells.length, terrain: 'field', owner: null, village: null })
+        this.cells.push({ hex, index: this.cells.length, terrain: 'field', owner: null, village: null, building: null })
       }
     }
   }

@@ -1,3 +1,5 @@
+import type { BuildingKind } from '../sim/world'
+
 export const en = {
   title: 'Wayfold',
   tagline: 'Every march redraws the map',
@@ -6,6 +8,8 @@ export const en = {
     'Drag from your village to another village or to any tile: all its people set off. Sweep over more of your villages to send them too.',
     'Grab a marching squad the same way to change its course.',
     'Squads repaint every tile they walk across. Raid the land around enemy villages to slow them down.',
+    'Your land brings gold. Click your field near a village to build a farm, a forge or a watchtower there.',
+    'Each village works the land closest to it: its estate. Hover a village to see it.',
     'The crown marks a capital. When it falls, the largest remaining village takes its place.',
     'Take every enemy village to win.',
   ],
@@ -17,13 +21,21 @@ export const en = {
   villages: 'Villages',
   people: 'People',
   land: 'Land',
+  gold: 'Gold',
+
+  buildings: { farm: 'Farm', forge: 'Forge', tower: 'Watchtower' } satisfies Record<BuildingKind, string>,
+  buildingHints: {
+    farm: 'Its village grows faster.',
+    forge: 'Its village raises soldiers: each is worth two in a fight, but the village grows slower.',
+    tower: 'Shoots enemy squads within two tiles: every second a volley takes a tenth of the squad.',
+  } satisfies Record<BuildingKind, string>,
 
   pause: 'Pause',
   resume: 'Resume',
   newMap: 'New map',
   pausedHint: 'Paused: you can still give orders. Space to resume.',
   speed: 'Game speed',
-  hint: 'Drag from your village or squad to a target, sweeping over more to send them together. Space: pause.',
+  hint: 'Drag from a village or squad to a target, sweeping over more to send them together. Click your field to build. Space: pause.',
 
   victory: 'Victory!',
   defeat: 'Defeat',
@@ -43,6 +55,8 @@ export const ru: Strings = {
     'Тяните от своей деревни к другой деревне или к любой клетке: в путь уходят все жители. Проведите по пути через другие свои деревни, чтобы отправить и их.',
     'Так же можно схватить идущий отряд и сменить ему курс.',
     'Отряды перекрашивают каждую клетку, по которой идут. Набеги на землю вокруг вражеских деревень замедляют их рост.',
+    'Земля приносит золото. Нажмите на своё поле возле деревни, чтобы построить там ферму, кузницу или башню.',
+    'Каждая деревня обрабатывает ближайшую к ней землю — свои угодья. Наведите на деревню, чтобы их увидеть.',
     'Корона отмечает столицу. Если она пала, столицей становится самая большая из оставшихся деревень.',
     'Захватите все вражеские деревни, чтобы победить.',
   ],
@@ -54,13 +68,21 @@ export const ru: Strings = {
   villages: 'Деревни',
   people: 'Жители',
   land: 'Земля',
+  gold: 'Золото',
+
+  buildings: { farm: 'Ферма', forge: 'Кузница', tower: 'Башня' },
+  buildingHints: {
+    farm: 'Деревня растёт быстрее.',
+    forge: 'Деревня растит солдат: в бою каждый за двоих, но рост медленнее.',
+    tower: 'Стреляет по вражеским отрядам в двух клетках вокруг: каждую секунду залп уносит десятую часть отряда.',
+  },
 
   pause: 'Пауза',
   resume: 'Продолжить',
   newMap: 'Новая карта',
   pausedHint: 'Пауза: приказы можно отдавать. Пробел — продолжить.',
   speed: 'Скорость игры',
-  hint: 'Тяните от своей деревни или отряда к цели, захватывая по пути другие, чтобы отправить их вместе. Пробел — пауза.',
+  hint: 'Тяните от деревни или отряда к цели, захватывая по пути другие, чтобы отправить их вместе. Нажмите на своё поле, чтобы строить. Пробел — пауза.',
 
   victory: 'Победа!',
   defeat: 'Поражение',

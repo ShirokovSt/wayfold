@@ -16,7 +16,7 @@ interface Actions {
 
 // The top bar: both players' numbers, the match clock and the buttons
 export class Hud {
-  private values: { player: PlayerId; villages: HTMLElement; people: HTMLElement; land: HTMLElement }[] = []
+  private values: { player: PlayerId; villages: HTMLElement; people: HTMLElement; land: HTMLElement; gold: HTMLElement }[] = []
   private clock = element('span', 'clock')
   private pauseButton = button('', () => this.actions.togglePause())
   private speedButtons: HTMLButtonElement[] = []
@@ -32,7 +32,8 @@ export class Hud {
 
   update(): void {
     const world = this.game.world
-    for (const { player, villages, people, land } of this.values) {
+    for (const { player, villages, people, land, gold } of this.values) {
+      setText(gold, String(Math.floor(world.gold[player])))
       setText(villages, String(world.villages.filter((v) => v.owner === player).length))
       setText(people, String(countPeople(world, player)))
       setText(land, `${Math.round(landShare(world, player) * 100)}%`)
@@ -49,7 +50,7 @@ export class Hud {
     this.values = []
     const stats = PLAYERS.map((player) => {
       const value = () => element('b', '')
-      const row = { player, villages: value(), people: value(), land: value() }
+      const row = { player, villages: value(), people: value(), land: value(), gold: value() }
       this.values.push(row)
       return element(
         'div',
@@ -58,6 +59,7 @@ export class Hud {
         element('span', 'label', t().villages), row.villages,
         element('span', 'label', t().people), row.people,
         element('span', 'label', t().land), row.land,
+        element('span', 'label', t().gold), row.gold,
       )
     })
     this.speedButtons = SPEEDS.map((speed) => button(`×${speed}`, () => this.actions.setSpeed(speed)))

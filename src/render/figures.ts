@@ -1,5 +1,7 @@
 import { ellipse } from './board'
-import { GOLD, SHADOW, type Tone, WOOD } from './palette'
+import type { Point } from '../core/hex'
+import type { BuildingKind } from '../sim/world'
+import { FARM, FORGE_GLOW, GOLD, SHADOW, SMOKE, STEEL, STONE, type Tone, WOOD } from './palette'
 
 // Village pieces: three little houses with roofs in the owner's color and a flag
 export function drawVillage(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number): void {
@@ -84,8 +86,10 @@ export function drawCrown(ctx: CanvasRenderingContext2D, x: number, y: number, s
   }
 }
 
-// A small walker; `phase` drives the bobbing and the swinging legs
-export function drawPerson(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, phase: number): void {
+// A small walker; `phase` drives the bobbing and the swinging legs; soldiers get a helmet and a spear
+export function drawPerson(
+  ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, phase: number, soldier = false,
+): void {
   const h = size * 0.34
   const bob = Math.abs(Math.sin(phase)) * h * 0.1
   const swing = Math.sin(phase) * h * 0.12
@@ -116,6 +120,192 @@ export function drawPerson(ctx: CanvasRenderingContext2D, x: number, y: number, 
   ctx.beginPath()
   ctx.arc(x, y - h * 0.88 - bob, h * 0.19, 0, Math.PI * 2)
   ctx.fill()
+  ctx.stroke()
+
+  if (soldier) {
+    ctx.fillStyle = STEEL.main
+    ctx.strokeStyle = STEEL.dark
+    ctx.lineWidth = h * 0.07
+    ctx.beginPath()
+    ctx.arc(x, y - h * 0.9 - bob, h * 0.22, Math.PI, 0)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    // Spear: a shaft and a steel tip
+    ctx.strokeStyle = WOOD.trunk
+    ctx.lineWidth = h * 0.08
+    ctx.beginPath()
+    ctx.moveTo(x + h * 0.36, y - h * 0.1 - bob)
+    ctx.lineTo(x + h * 0.36, y - h * 1.15 - bob)
+    ctx.stroke()
+    ctx.fillStyle = STEEL.main
+    ctx.beginPath()
+    ctx.moveTo(x + h * 0.27, y - h * 1.1 - bob)
+    ctx.lineTo(x + h * 0.36, y - h * 1.38 - bob)
+    ctx.lineTo(x + h * 0.45, y - h * 1.1 - bob)
+    ctx.closePath()
+    ctx.fill()
+  }
+  ctx.lineCap = 'butt'
+}
+
+// Buildings stand on their tile like game pieces; roofs and pennants show the owner
+export function drawBuilding(
+  ctx: CanvasRenderingContext2D, kind: BuildingKind, x: number, y: number, size: number, tone: Tone, time: number,
+): void {
+  if (kind === 'farm') drawFarm(ctx, x, y, size, tone)
+  else if (kind === 'forge') drawForge(ctx, x, y, size, tone, time)
+  else drawTower(ctx, x, y, size, tone)
+}
+
+// Furrowed plot with ripe wheat and a haystack
+function drawFarm(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone): void {
+  ctx.save()
+  ctx.beginPath()
+  ctx.ellipse(x - size * 0.08, y + size * 0.08, size * 0.5, size * 0.3, 0, 0, Math.PI * 2)
+  ctx.fillStyle = FARM.soil
+  ctx.fill()
+  ctx.clip()
+  ctx.strokeStyle = FARM.wheat
+  ctx.lineWidth = size * 0.07
+  ctx.lineCap = 'round'
+  for (let row = -2; row <= 2; row++) {
+    const rowY = y + size * (0.08 + row * 0.13)
+    ctx.beginPath()
+    ctx.moveTo(x - size * 0.6, rowY + size * 0.1)
+    ctx.lineTo(x + size * 0.4, rowY - size * 0.1)
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  const hx = x + size * 0.32
+  const hy = y + size * 0.02
+  ellipse(ctx, hx, hy + size * 0.02, size * 0.17, size * 0.06, SHADOW)
+  ctx.beginPath()
+  ctx.arc(hx, hy, size * 0.15, Math.PI, 0)
+  ctx.closePath()
+  ctx.fillStyle = FARM.hay
+  ctx.strokeStyle = FARM.hayDark
+  ctx.lineWidth = size * 0.03
+  ctx.fill()
+  ctx.stroke()
+  drawPennant(ctx, hx, hy - size * 0.13, size * 0.7, tone)
+}
+
+// A stone smithy with a glowing door and smoke from the chimney
+function drawForge(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number): void {
+  const w = size * 0.5
+  const h = size * 0.3
+  const wallTop = y - h + size * 0.1
+  ellipse(ctx, x, y + size * 0.12, size * 0.4, size * 0.13, SHADOW)
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = size * 0.03
+  ctx.strokeStyle = STONE.dark
+  ctx.fillStyle = STONE.main
+  ctx.fillRect(x - w / 2, wallTop, w, h)
+  ctx.strokeRect(x - w / 2, wallTop, w, h)
+  ctx.fillStyle = FORGE_GLOW
+  ctx.fillRect(x - size * 0.07, y - size * 0.06, size * 0.14, size * 0.16)
+
+  // Chimney behind the roof, then the roof
+  ctx.fillStyle = STONE.dark
+  ctx.fillRect(x + w * 0.18, wallTop - size * 0.3, size * 0.09, size * 0.25)
+  ctx.beginPath()
+  ctx.moveTo(x - w * 0.62, wallTop + size * 0.01)
+  ctx.lineTo(x, wallTop - size * 0.22)
+  ctx.lineTo(x + w * 0.62, wallTop + size * 0.01)
+  ctx.closePath()
+  ctx.fillStyle = tone.main
+  ctx.strokeStyle = tone.dark
+  ctx.fill()
+  ctx.stroke()
+
+  // Smoke puffs drift up and fade
+  for (let i = 0; i < 3; i++) {
+    const t = (time * 0.6 + i / 3) % 1
+    ctx.globalAlpha = 0.5 * (1 - t)
+    ctx.beginPath()
+    ctx.arc(x + w * 0.22 + t * size * 0.12, wallTop - size * (0.34 + t * 0.4), size * (0.05 + t * 0.07), 0, Math.PI * 2)
+    ctx.fillStyle = SMOKE
+    ctx.fill()
+  }
+  ctx.globalAlpha = 1
+}
+
+// A wooden lookout on four legs
+function drawTower(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone): void {
+  const top = y - size * 0.55
+  ellipse(ctx, x, y + size * 0.1, size * 0.3, size * 0.1, SHADOW)
+  ctx.strokeStyle = WOOD.roof
+  ctx.lineCap = 'round'
+  ctx.lineWidth = size * 0.05
+  ctx.beginPath()
+  ctx.moveTo(x - size * 0.2, y + size * 0.1)
+  ctx.lineTo(x - size * 0.13, top)
+  ctx.moveTo(x + size * 0.2, y + size * 0.1)
+  ctx.lineTo(x + size * 0.13, top)
+  ctx.stroke()
+  ctx.lineWidth = size * 0.03
+  ctx.beginPath()
+  ctx.moveTo(x - size * 0.18, y - size * 0.05)
+  ctx.lineTo(x + size * 0.15, top + size * 0.15)
+  ctx.moveTo(x + size * 0.18, y - size * 0.05)
+  ctx.lineTo(x - size * 0.15, top + size * 0.15)
+  ctx.stroke()
+
+  ctx.fillStyle = WOOD.trunk
+  ctx.strokeStyle = WOOD.roof
+  ctx.fillRect(x - size * 0.2, top - size * 0.08, size * 0.4, size * 0.1)
+  ctx.strokeRect(x - size * 0.2, top - size * 0.08, size * 0.4, size * 0.1)
+  ctx.beginPath()
+  ctx.moveTo(x - size * 0.26, top - size * 0.08)
+  ctx.lineTo(x, top - size * 0.32)
+  ctx.lineTo(x + size * 0.26, top - size * 0.08)
+  ctx.closePath()
+  ctx.fillStyle = tone.main
+  ctx.strokeStyle = tone.dark
+  ctx.lineJoin = 'round'
+  ctx.fill()
+  ctx.stroke()
+  ctx.lineCap = 'butt'
+}
+
+// Where a tower's arrows fly from, above its tile center
+export const TOWER_TOP = 0.6
+
+function drawPennant(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone): void {
+  ctx.strokeStyle = WOOD.trunk
+  ctx.lineWidth = size * 0.04
+  ctx.beginPath()
+  ctx.moveTo(x, y)
+  ctx.lineTo(x, y - size * 0.35)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(x, y - size * 0.35)
+  ctx.lineTo(x + size * 0.22, y - size * 0.29)
+  ctx.lineTo(x, y - size * 0.22)
+  ctx.closePath()
+  ctx.fillStyle = tone.main
+  ctx.strokeStyle = tone.dark
+  ctx.lineWidth = size * 0.025
+  ctx.fill()
+  ctx.stroke()
+}
+
+// A tower's arrow on its way: a short dark stroke flying in an arc; t goes from 0 to 1
+export function drawArrow(ctx: CanvasRenderingContext2D, from: Point, to: Point, t: number, size: number): void {
+  const at = (k: number) => ({
+    x: from.x + (to.x - from.x) * k,
+    y: from.y + (to.y - from.y) * k - Math.sin(k * Math.PI) * size * 0.4,
+  })
+  const head = at(t)
+  const tail = at(Math.max(0, t - 0.25))
+  ctx.strokeStyle = WOOD.roof
+  ctx.lineWidth = size * 0.04
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(tail.x, tail.y)
+  ctx.lineTo(head.x, head.y)
   ctx.stroke()
   ctx.lineCap = 'butt'
 }

@@ -1,4 +1,6 @@
+import { collectGold } from './economy'
 import { moveSquads, resolveClashes } from './squads'
+import { fireTowers } from './towers'
 import { growVillages } from './villages'
 import { HUMAN, type PlayerId, RIVAL, type World } from './world'
 
@@ -6,7 +8,9 @@ export function tick(world: World, dt: number): void {
   if (world.winner !== null) return
   world.time += dt
   growVillages(world, dt)
+  collectGold(world, dt)
   moveSquads(world, dt)
+  fireTowers(world, dt)
   resolveClashes(world)
   world.winner = findWinner(world)
 }

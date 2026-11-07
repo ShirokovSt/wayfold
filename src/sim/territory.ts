@@ -1,5 +1,5 @@
 import type { GameMap } from './map'
-import { LAND_RADIUS, isPassable } from './rules'
+import { isPassable } from './rules'
 import type { Cell, Owner, PlayerId, Village, World } from './world'
 
 // A squad walking over a tile makes it theirs; village tiles change hands only by capture
@@ -14,14 +14,8 @@ export function claimAround(map: GameMap, village: Village, radius: number): voi
   }
 }
 
-// Own tiles around the village, the village tile itself not counted
-export function landAround(map: GameMap, village: Village): number {
-  if (village.owner === null) return 0
-  let count = 0
-  for (const cell of map.within(village.cell, LAND_RADIUS)) {
-    if (cell !== village.cell && cell.owner === village.owner) count++
-  }
-  return count
+export function ownTiles(world: World, owner: PlayerId): number {
+  return world.map.cells.filter((cell) => cell.owner === owner && isPassable(cell)).length
 }
 
 // Share of all walkable tiles that belong to the owner, from 0 to 1

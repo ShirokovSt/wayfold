@@ -199,6 +199,66 @@ button.primary:hover {
   display: none;
 }
 
+/* Build menu: a row of buildings above the clicked tile */
+
+.build-menu {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 4px 0 #c9b791, 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+
+.build-menu[hidden] {
+  display: none;
+}
+
+.build-menu .building {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 76px;
+  padding: 4px 6px 6px;
+  color: var(--ink);
+  background: #efe3c8;
+  border-color: #c9b791;
+  font-size: 13px;
+}
+
+.build-menu .building:hover:not(:disabled) {
+  background: #f8f0dd;
+}
+
+.build-menu .building:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.build-menu .icon {
+  width: 44px;
+  height: 44px;
+}
+
+.build-menu .cost {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coin {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f2c14e;
+  border: 1.5px solid #8a6514;
+}
+
 /* Cards over the board */
 
 #overlay {

@@ -1,7 +1,8 @@
 import { DIRECTIONS, type Point, addHex, hexCorner } from '../core/hex'
 import { type Random, createRandom } from '../core/rng'
 import type { GameMap } from '../sim/map'
-import type { Cell } from '../sim/world'
+import { estateTiles, estateVillage } from '../sim/estates'
+import type { Cell, Village, World } from '../sim/world'
 import { type Layout, TILE_DEPTH } from './layout'
 import { LEAVES, ROCK, SHADOW, TABLE, TERRAIN, WOOD, ownerTone } from './palette'
 
@@ -259,4 +260,46 @@ function shade(color: string, amount: number): string {
   const channels = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16))
   const mixed = channels.map((c) => Math.round(c + (target - c) * Math.abs(amount)))
   return `rgb(${mixed.join(', ')})`
+}
+
+// Thin dashed lines between the estates of one player's villages; the hovered village's estate is lit up
+export function drawEstates(ctx: CanvasRenderingContext2D, world: World, layout: Layout, lit: Village | null): void {
+  const size = layout.size
+  const estates = new Map<Cell, Village | null>()
+  for (const cell of world.map.cells) estates.set(cell, estateVillage(world, cell))
+
+  if (lit) {
+    ctx.globalAlpha = 0.35
+    ctx.fillStyle = ownerTone(lit.owner).light
+    for (const cell of estateTiles(world, lit)) {
+      hexPath(ctx, tileCenter(layout, cell), size * FACE * 0.97)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
+  }
+
+  ctx.setLineDash([size * 0.2, size * 0.14])
+  ctx.lineCap = 'round'
+  ctx.lineWidth = size * 0.075
+  for (const cell of world.map.cells) {
+    const estate = estates.get(cell)
+    if (!estate) continue
+    const center = tileCenter(layout, cell)
+    ctx.strokeStyle = ownerTone(cell.owner).light
+    ctx.beginPath()
+    DIRECTIONS.forEach((direction, i) => {
+      const neighbor = world.map.cellAt(addHex(cell.hex, direction))
+      // Each shared edge once: only from the cell with the smaller index
+      if (!neighbor || neighbor.index < cell.index || neighbor.owner !== cell.owner) return
+      const other = estates.get(neighbor)
+      if (!other || other === estate) return
+      const a = hexCorner(center, size * FACE, i)
+      const b = hexCorner(center, size * FACE, i + 1)
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x, b.y)
+    })
+    ctx.stroke()
+  }
+  ctx.setLineDash([])
+  ctx.lineCap = 'butt'
 }

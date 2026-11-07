@@ -1,7 +1,8 @@
 import type { Drag } from '../input/pointer'
-import { HUMAN, type Squad, type World } from '../sim/world'
-import { drawDecor, drawGround, drawTable, drawTerritory, hexPath, tileCenter } from './board'
-import { drawBadge, drawCrown, drawPerson, drawVillage } from './figures'
+import { ARROW_SECONDS } from '../sim/towers'
+import { type Cell, HUMAN, type Squad, type World } from '../sim/world'
+import { drawDecor, drawEstates, drawGround, drawTable, drawTerritory, hexPath, tileCenter } from './board'
+import { TOWER_TOP, drawArrow, drawBadge, drawBuilding, drawCrown, drawPerson, drawVillage } from './figures'
 import { Layout } from './layout'
 import { ownerTone } from './palette'
 
@@ -15,6 +16,14 @@ const FORMATION = [
   { x: -0.32, y: 0.06 },
   { x: 0.33, y: 0.05 },
 ]
+
+// What the player is doing right now, shown on top of the world
+export interface View {
+  drag: Drag | null
+  hover: Cell | null // the tile under the pointer
+  selected: Cell | null // the tile the build menu is open for
+  showRoutes: boolean // on pause: where your squads are heading
+}
 
 export class Renderer {
   readonly layout = new Layout()
@@ -50,19 +59,32 @@ export class Renderer {
     this.drawLayers()
   }
 
-  // `alpha` is how far we are between the last tick and the next one, for smooth movement;
-  // on pause the routes of your squads are shown, to plan the next orders
-  draw(alpha: number, time: number, drag: Drag | null, showRoutes: boolean): void {
+  // `alpha` is how far we are between the last tick and the next one, for smooth movement
+  draw(alpha: number, time: number, view: View): void {
     const ctx = this.ctx
     const dpr = this.canvas.width / this.width
+    const size = this.layout.size
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.drawImage(this.ground, 0, 0, this.width, this.height)
     drawTerritory(ctx, this.world.map, this.layout)
+    const hovered = view.hover?.village
+    drawEstates(ctx, this.world, this.layout, hovered?.owner === HUMAN ? hovered : null)
     ctx.drawImage(this.decor, 0, 0, this.width, this.height)
-    if (showRoutes) this.drawRoutes()
-    if (drag) this.drawDrag(drag)
+    if (view.selected) {
+      ctx.lineWidth = size * 0.08
+      ctx.strokeStyle = ownerTone(HUMAN).light
+      hexPath(ctx, tileCenter(this.layout, view.selected), size * 0.86)
+      ctx.stroke()
+    }
 
-    const size = this.layout.size
+    for (const cell of this.world.map.cells) {
+      if (!cell.building) continue
+      const { x, y } = tileCenter(this.layout, cell)
+      drawBuilding(ctx, cell.building.kind, x, y, size, ownerTone(cell.owner), time)
+    }
+    if (view.showRoutes) this.drawRoutes()
+    if (view.drag) this.drawDrag(view.drag)
+
     for (const village of this.world.villages) {
       const { x, y } = tileCenter(this.layout, village.cell)
       drawVillage(ctx, x, y, size, ownerTone(village.owner), time)
@@ -70,6 +92,11 @@ export class Renderer {
     }
     const squads = [...this.world.squads].sort((a, b) => a.y - b.y)
     for (const squad of squads) this.drawSquad(squad, alpha, time)
+    for (const arrow of this.world.arrows) {
+      const from = this.layout.toScreen(arrow.from.x, arrow.from.y)
+      from.y -= size * TOWER_TOP
+      drawArrow(ctx, from, this.layout.toScreen(arrow.to.x, arrow.to.y), arrow.age / ARROW_SECONDS, size)
+    }
     for (const village of this.world.villages) {
       const { x, y } = tileCenter(this.layout, village.cell)
       drawBadge(ctx, x, y + size * 0.55, String(Math.floor(village.population)), size, ownerTone(village.owner))
@@ -98,7 +125,8 @@ export class Renderer {
     )
     const walkers = FORMATION.slice(0, squad.count).sort((a, b) => a.y - b.y)
     walkers.forEach((spot, i) => {
-      drawPerson(this.ctx, x + spot.x * size, y + spot.y * size + size * 0.15, size, tone, time * 9 + i * 1.7 + squad.id)
+      const phase = time * 9 + i * 1.7 + squad.id
+      drawPerson(this.ctx, x + spot.x * size, y + spot.y * size + size * 0.15, size, tone, phase, squad.strength > 1)
     })
     if (squad.count > 1) drawBadge(this.ctx, x, y - size * 0.38, String(squad.count), size * 0.8, tone)
   }

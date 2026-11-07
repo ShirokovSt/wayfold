@@ -14,9 +14,14 @@ export interface Drag {
   paths: Cell[][] // the route of every member that can reach the target
 }
 
-// Press on your village or squad, sweep over more of them, release on the target: they all set off
+// Press on your village or squad, sweep over more of them, release on the target: they all set off.
+// A plain click on any other tile is passed on, e.g. to open the build menu
 export class PointerInput {
   drag: Drag | null = null
+  hover: Cell | null = null
+  onPress: () => void = () => {}
+  onTileClick: (cell: Cell) => void = () => {}
+  private pressed: Cell | null = null // a tile pressed outside of a drag
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -25,19 +30,22 @@ export class PointerInput {
   ) {
     canvas.addEventListener('pointerdown', (event) => this.press(event))
     canvas.addEventListener('pointermove', (event) => this.move(event))
-    canvas.addEventListener('pointerup', () => this.release())
+    canvas.addEventListener('pointerup', (event) => this.release(event))
     canvas.addEventListener('pointercancel', () => (this.drag = null))
+    canvas.addEventListener('pointerleave', () => (this.hover = null))
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') this.drag = null
     })
   }
 
   private press(event: PointerEvent): void {
+    this.onPress()
     // Orders work during the pause too: plan calmly, then let it run
     if (this.game.world.winner !== null) return
-    this.drag ={ villages: [], squads: [], target: null, paths: [] }
+    this.drag = { villages: [], squads: [], target: null, paths: [] }
     if (!this.gather(event)) {
       this.drag = null
+      this.pressed = this.cellAt(event) ?? null
       return
     }
     this.canvas.setPointerCapture(event.pointerId)
@@ -45,6 +53,7 @@ export class PointerInput {
 
   private move(event: PointerEvent): void {
     const cell = this.cellAt(event) ?? null
+    this.hover = cell
     const drag = this.drag
     this.canvas.style.cursor = drag || this.ownVillageAt(event) || this.ownSquadAt(event) ? 'pointer' : 'default'
     if (!drag) return
@@ -55,10 +64,16 @@ export class PointerInput {
     }
   }
 
-  private release(): void {
+  private release(event: PointerEvent): void {
     const drag = this.drag
+    const pressed = this.pressed
     this.drag = null
-    if (!drag?.target) return
+    this.pressed = null
+    if (!drag) {
+      if (pressed && pressed === this.cellAt(event)) this.onTileClick(pressed)
+      return
+    }
+    if (!drag.target) return
     const world = this.game.world
     // The village you release on is the destination, not a member of the group
     for (const village of drag.villages) {

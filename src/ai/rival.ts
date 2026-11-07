@@ -1,17 +1,19 @@
 import { hexDistance } from '../core/hex'
 import type { Random } from '../core/rng'
+import { build, canBuildOn } from '../sim/economy'
+import { estateBuildings, estateTiles } from '../sim/estates'
 import { findPath, pathDuration } from '../sim/pathfind'
-import { POPULATION_CAP } from '../sim/rules'
+import { BUILDING_COST, POPULATION_CAP } from '../sim/rules'
 import { sendSquad, squadTarget } from '../sim/squads'
-import { growthRate } from '../sim/villages'
-import type { Cell, PlayerId, Village, World } from '../sim/world'
+import { growthRate, hasForge } from '../sim/villages'
+import { type BuildingKind, type Cell, type PlayerId, type Village, type World, opponent } from '../sim/world'
 
 // How the rival plays: how soon and how often it moves, and how cautiously
 const FIRST_MOVE_SECONDS = 10
 const THINK_SECONDS = 3.5
 const SAFETY_MARGIN = 4 // extra people sent on top of what the target should have on arrival
 
-// A simple opponent: every few seconds it makes one move — defend, capture or raid
+// A simple opponent: every few seconds it makes one move — defend, capture or raid — and spends its gold
 export class Rival {
   private timer = FIRST_MOVE_SECONDS
 
@@ -25,6 +27,52 @@ export class Rival {
     if (this.timer > 0) return
     this.timer = THINK_SECONDS * (0.8 + this.random() * 0.4)
     this.defend(world) || this.capture(world) || this.raid(world)
+    this.develop(world)
+  }
+
+  // A farm at the capital first, then a forge there once it has a few villages, a tower at the front,
+  // farms for the other villages and then second farms; it saves up for the first plan with a free spot
+  private develop(world: World): void {
+    const villages = this.villages(world)
+    const capital = villages.find((v) => v.capital)
+    const front = this.frontVillage(world)
+    const farms = (village: Village) => estateBuildings(world, village, 'farm').length
+    const plans: [Village, BuildingKind][] = []
+    if (capital && farms(capital) === 0) plans.push([capital, 'farm'])
+    if (capital && villages.length >= 3 && !hasForge(world, capital)) plans.push([capital, 'forge'])
+    if (front && estateBuildings(world, front, 'tower').length === 0) plans.push([front, 'tower'])
+    for (const village of villages) if (farms(village) === 0) plans.push([village, 'farm'])
+    for (const village of villages) if (farms(village) === 1) plans.push([village, 'farm'])
+
+    for (const [village, kind] of plans) {
+      const spot = this.buildSpot(world, village, kind)
+      if (!spot) continue
+      if (world.gold[this.player] >= BUILDING_COST[kind]) build(world, this.player, spot, kind)
+      return
+    }
+  }
+
+  // Towers go toward the enemy, farms and forges close to home
+  private buildSpot(world: World, village: Village, kind: BuildingKind): Cell | null {
+    const spots = estateTiles(world, village).filter((cell) => canBuildOn(world, this.player, cell))
+    const enemy = this.enemyVillages(world)
+    const score = (cell: Cell) =>
+      kind === 'tower' && enemy.length > 0
+        ? Math.min(...enemy.map((e) => hexDistance(e.cell.hex, cell.hex)))
+        : hexDistance(village.cell.hex, cell.hex)
+    return spots.sort((a, b) => score(a) - score(b))[0] ?? null
+  }
+
+  // The own village closest to the enemy
+  private frontVillage(world: World): Village | null {
+    const enemy = this.enemyVillages(world)
+    if (enemy.length === 0) return null
+    const distance = (village: Village) => Math.min(...enemy.map((e) => hexDistance(e.cell.hex, village.cell.hex)))
+    return this.villages(world).sort((a, b) => distance(a) - distance(b))[0] ?? null
+  }
+
+  private enemyVillages(world: World): Village[] {
+    return world.villages.filter((village) => village.owner === opponent(this.player))
   }
 
   // Sends help to a village that an enemy squad is about to take

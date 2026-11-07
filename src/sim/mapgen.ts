@@ -12,7 +12,7 @@ import {
   isPassable,
 } from './rules'
 import { claimAround } from './territory'
-import { type Cell, HUMAN, type Owner, RIVAL, type Terrain, type Village, type World } from './world'
+import { type Cell, HUMAN, type Owner, RIVAL, type Terrain, type Village, type World, newWorld } from './world'
 
 const UP_LEFT: Hex = { q: 0, r: -1 }
 const UP_RIGHT: Hex = { q: 1, r: -1 }
@@ -41,7 +41,7 @@ function tryCreateWorld(seed: number): World | null {
 
   const villages = placeVillages(map, random)
   if (!villages || !allReachable(map, villages)) return null
-  return { map, villages, squads: [], time: 0, winner: null, nextId: villages.length }
+  return newWorld(map, villages)
 }
 
 // Patches of terrain around random centers
@@ -91,7 +91,7 @@ function placeVillages(map: GameMap, random: Random): Village[] | null {
 
   const villages: Village[] = []
   const addVillage = (cell: Cell, owner: Owner, population: number) => {
-    const village = { id: villages.length, cell, owner, population, capital: owner !== null }
+    const village = { id: villages.length, cell, owner, population, capital: owner !== null, capturedAt: 0 }
     cell.terrain = 'field'
     cell.village = village
     cell.owner = owner
