@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SQUAD_SPEED, TICK_SECONDS } from './rules'
 import { redirectSquad, sendSquad } from './squads'
-import { addVillage, testWorld } from './testWorld.testing'
+import { addVillage, handmadeWorld } from './handmade'
 import { tick } from './tick'
 import { growthRate } from './villages'
 import { HUMAN, RIVAL, type World } from './world'
@@ -14,7 +14,7 @@ function run(world: World, seconds: number): void {
 
 describe('squads', () => {
   it('take all the people of the village and repaint the tiles they cross', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const home = addVillage(world, 0, 0, HUMAN, 7.6)
     addVillage(world, 6, 2, RIVAL, 1)
     const target = world.map.cellAtOffset(6, 0)!
@@ -28,7 +28,7 @@ describe('squads', () => {
   })
 
   it('return home after a raid on open land', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const home = addVillage(world, 0, 0, HUMAN, 5)
     addVillage(world, 6, 2, RIVAL, 1)
     sendSquad(world, HUMAN, home, world.map.cellAtOffset(3, 0)!)
@@ -38,7 +38,7 @@ describe('squads', () => {
   })
 
   it('capture a village when they outnumber it, and claim the land around', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const home = addVillage(world, 0, 0, HUMAN, 10)
     const neutral = addVillage(world, 3, 0, null, 6)
     addVillage(world, 6, 2, RIVAL, 1)
@@ -50,13 +50,13 @@ describe('squads', () => {
   })
 
   it('cannot be sent from someone else’s village', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const enemy = addVillage(world, 0, 0, RIVAL, 10)
     expect(sendSquad(world, HUMAN, enemy, world.map.cellAtOffset(3, 0)!)).toBeNull()
   })
 
   it('cancel each other out when enemies meet', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const left = addVillage(world, 0, 0, HUMAN, 9)
     const right = addVillage(world, 6, 0, RIVAL, 4)
     sendSquad(world, HUMAN, left, right.cell)
@@ -70,7 +70,7 @@ describe('squads', () => {
 
 describe('villages', () => {
   it('grow faster with more own land around', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const village = addVillage(world, 3, 1, HUMAN, 0)
     addVillage(world, 0, 0, RIVAL, 1)
     const bare = growthRate(world, village)
@@ -80,7 +80,7 @@ describe('villages', () => {
   })
 
   it('neutral ones keep their garrison', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const neutral = addVillage(world, 3, 1, null, 6)
     addVillage(world, 0, 0, HUMAN, 1)
     addVillage(world, 6, 2, RIVAL, 1)
@@ -91,7 +91,7 @@ describe('villages', () => {
 
 describe('redirected squads', () => {
   it('turn around on the way and head for the new target', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const home = addVillage(world, 0, 0, HUMAN, 5)
     addVillage(world, 6, 2, RIVAL, 1)
     const squad = sendSquad(world, HUMAN, home, world.map.cellAtOffset(6, 0)!)!
@@ -107,7 +107,7 @@ describe('redirected squads', () => {
   })
 
   it('can be called back home', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const home = addVillage(world, 0, 0, HUMAN, 5)
     addVillage(world, 6, 2, RIVAL, 1)
     const squad = sendSquad(world, HUMAN, home, world.map.cellAtOffset(6, 0)!)!
@@ -119,7 +119,7 @@ describe('redirected squads', () => {
   })
 
   it('only obey their owner', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const enemy = addVillage(world, 6, 0, RIVAL, 5)
     addVillage(world, 0, 0, HUMAN, 1)
     const squad = sendSquad(world, RIVAL, enemy, world.map.cellAtOffset(2, 0)!)!
@@ -129,7 +129,7 @@ describe('redirected squads', () => {
 
 describe('capitals', () => {
   it('move to the most populous village when the capital falls', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const capital = addVillage(world, 3, 0, RIVAL, 2, true)
     const small = addVillage(world, 6, 2, RIVAL, 3)
     const big = addVillage(world, 0, 2, RIVAL, 9)

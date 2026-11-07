@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { findPath } from './pathfind'
-import { addVillage, testWorld } from './testWorld.testing'
+import { addVillage, handmadeWorld } from './handmade'
 
 describe('findPath', () => {
   it('goes around mountains', () => {
-    const { map } = testWorld([
+    const { map } = handmadeWorld([
       '......',
       '.mm..',
       '......',
@@ -15,7 +15,7 @@ describe('findPath', () => {
   })
 
   it('prefers a detour over fields to a straight way through forest', () => {
-    const { map } = testWorld([
+    const { map } = handmadeWorld([
       '......',
       '.ff..',
       '......',
@@ -25,7 +25,7 @@ describe('findPath', () => {
   })
 
   it('returns null when the goal is walled off or impassable', () => {
-    const { map } = testWorld([
+    const { map } = handmadeWorld([
       '..w..',
       '.ww.',
       '..w..',
@@ -35,7 +35,7 @@ describe('findPath', () => {
   })
 
   it('walks around villages that are not the goal', () => {
-    const world = testWorld([
+    const world = handmadeWorld([
       '.....',
       '....',
       '.....',

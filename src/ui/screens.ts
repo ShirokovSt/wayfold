@@ -12,6 +12,13 @@ export interface MatchChoice {
   change(settings: MatchSettings): void
 }
 
+export interface MenuActions {
+  newMap(): void
+  tutorial(): void
+  continue?: () => void // only while a match is on
+  tutorialFirst: boolean // offered first until it has been played once
+}
+
 // Cards over the board: the menu, the new map card and the end of the match
 export class Screens {
   private content: (() => HTMLElement) | null = null
@@ -25,18 +32,19 @@ export class Screens {
     return this.content !== null
   }
 
-  // Without onContinue there is no match to go back to
-  menu(onNewMap: () => void, onContinue?: () => void): void {
-    this.show(onContinue ?? null, () => {
-      const buttons = element('div', 'menu-buttons')
-      if (onContinue) buttons.append(button(t().continue, onContinue, 'primary'))
-      buttons.append(button(t().newMap, onNewMap, onContinue ? '' : 'primary'))
+  // The first button is the main one: Continue during a match, otherwise the tutorial or a new map
+  menu(actions: MenuActions): void {
+    this.show(actions.continue ?? null, () => {
+      const buttons = [button(t().newMap, actions.newMap), button(t().tutorial, actions.tutorial)]
+      if (actions.tutorialFirst) buttons.reverse()
+      if (actions.continue) buttons.unshift(button(t().continue, actions.continue))
+      buttons[0].classList.add('primary')
       return element(
         'div',
         'card menu',
         element('h1', '', t().title),
         element('p', 'tagline', t().tagline),
-        buttons,
+        element('div', 'menu-buttons', ...buttons),
         languageSelect(),
       )
     })
@@ -62,6 +70,18 @@ export class Screens {
         element('h2', '', won ? t().victory : t().defeat),
         element('p', '', won ? t().victoryText : t().defeatText),
         element('p', 'muted', `${t().matchTime}: ${formatTime(seconds)}`),
+        element('div', 'actions centered', button(t().newMap, onNewMap, 'primary'), button(t().toMenu, onMenu)),
+      ),
+    )
+  }
+
+  tutorialDone(onNewMap: () => void, onMenu: () => void): void {
+    this.show(null, () =>
+      element(
+        'div',
+        'card small won',
+        element('h2', '', t().tutorialDone),
+        element('p', '', t().tutorialDoneText),
         element('div', 'actions centered', button(t().newMap, onNewMap, 'primary'), button(t().toMenu, onMenu)),
       ),
     )

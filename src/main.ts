@@ -7,13 +7,16 @@ import { PointerInput } from './input/pointer'
 import { Renderer } from './render/renderer'
 import { TICK_SECONDS } from './sim/rules'
 import { HUMAN } from './sim/world'
+import { readStored, store } from './storage'
 import { BuildMenu } from './ui/buildMenu'
 import { Hud } from './ui/hud'
 import { Screens } from './ui/screens'
+import { TutorialPanel } from './ui/tutorialPanel'
 import { zoomButtons } from './ui/zoomButtons'
 
 const TICK_MS = TICK_SECONDS * 1000
 const MAX_FRAME_MS = 250 // after a long pause, don't try to catch up
+const TUTORIAL_KEY = 'wayfold.tutorial' // set once the tutorial has been started
 
 const favicon = document.createElement('link')
 favicon.rel = 'icon'
@@ -31,6 +34,7 @@ const stage = document.querySelector<HTMLElement>('.stage')!
 const buildMenu = new BuildMenu(stage, game, renderer.layout)
 const camera = new CameraControls(canvas, renderer.layout)
 const banner = document.querySelector<HTMLElement>('#banner')!
+const tutorial = new TutorialPanel(stage, skipTutorial)
 let endShown = false
 let pausedBeforeMenu = false
 
@@ -78,7 +82,12 @@ function openMenu(): void {
     buildMenu.close()
   }
   const inMatch = game.started && game.world.winner === null
-  screens.menu(chooseNewMap, inMatch ? continueMatch : undefined)
+  screens.menu({
+    newMap: chooseNewMap,
+    tutorial: startTutorial,
+    continue: inMatch ? continueMatch : undefined,
+    tutorialFirst: readStored(TUTORIAL_KEY) === null,
+  })
 }
 
 function continueMatch(): void {
@@ -100,6 +109,26 @@ function chooseNewMap(): void {
 
 function newMap(): void {
   game.restart(Date.now())
+  tutorial.stop()
+  startMatch()
+}
+
+function startTutorial(): void {
+  game.startTutorial()
+  store(TUTORIAL_KEY, 'started')
+  tutorial.start()
+  startMatch()
+}
+
+// Leaves the tutorial for the menu, with a fresh map behind it
+function skipTutorial(): void {
+  tutorial.stop()
+  game.restart(Date.now())
+  renderer.setWorld(game.world)
+  openMenu()
+}
+
+function startMatch(): void {
   renderer.setWorld(game.world)
   input.drag = null
   buildMenu.close()
@@ -147,18 +176,25 @@ function frame(now: number): void {
     pending -= TICK_MS
   }
   buildMenu.update()
+  tutorial.update(game.world, game.paused)
   renderer.draw(game.paused ? 1 : pending / TICK_MS, now / 1000, {
     drag: input.drag,
     hover: input.hover,
     selected: buildMenu.cell,
     showRoutes: game.paused,
+    marked: tutorial.marked(game.world),
   })
   hud.update()
 
   const winner = game.world.winner
   if (winner !== null && !endShown) {
     endShown = true
-    screens.end(winner === HUMAN, game.world.time, chooseNewMap, openMenu)
+    if (tutorial.active) {
+      tutorial.stop()
+      screens.tutorialDone(chooseNewMap, openMenu)
+    } else {
+      screens.end(winner === HUMAN, game.world.time, chooseNewMap, openMenu)
+    }
   }
 }
 

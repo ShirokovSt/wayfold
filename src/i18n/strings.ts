@@ -1,21 +1,10 @@
 import type { Difficulty } from '../ai/rival'
 import type { BuildingKind, MapSize, MapType } from '../sim/world'
+import type { StepId } from '../tutorial/tutorial'
 
 export const en = {
   title: 'Wayfold',
   tagline: 'Every march redraws the map',
-  rules: [
-    'Villages raise people. The more of your land around a village, the faster it grows.',
-    'Drag from your village to another village or to any tile: all its people set off. Sweep over more of your villages to send them too.',
-    'Grab a marching squad the same way to change its course.',
-    'Squads repaint every tile they walk across. Raid the land around enemy villages to slow them down.',
-    'Your land brings gold. Click your field near a village to build a farm, a forge or a watchtower there.',
-    'Each village works the land closest to it: its estate. Hover a village to see it.',
-    'A watchtower guards everything within the dotted line: only soldiers from a forge can take that land, its villages and the tower.',
-    'The crown marks a capital. When it falls, the largest remaining village takes its place.',
-    'Zoom with the mouse wheel, a touchpad pinch or the + and − buttons; drag empty ground to move the map.',
-    'Take every enemy village to win.',
-  ],
   play: 'Play',
   language: 'Language',
   mapType: 'Map',
@@ -54,6 +43,24 @@ export const en = {
   pausedHint: 'Paused: you can still give orders. Space to resume.',
   speed: 'Game speed',
 
+  tutorial: 'Tutorial',
+  skipTutorial: 'Skip tutorial',
+  next: 'Next',
+  step: 'Step',
+  tutorialSteps: {
+    intro: 'The crown marks your capital; the rival lives across the river. Villages raise people. Take every enemy village to win. In the tutorial the rival does not attack. Zoom with the mouse wheel, a touchpad pinch or the + and − buttons; drag empty ground to move the map.',
+    capture: 'Drag from your capital to the village next to it. All its people set off; if they outnumber the village, it becomes yours.',
+    land: 'Squads repaint every tile they walk across. Land brings gold, and each village grows from the land closest to it: its estate. Hover a village to see it.',
+    pause: 'Press Space or Pause. While paused you can still give orders: they start when the game resumes.',
+    group: 'The far village is too big for one of yours. Drag from your capital over your second village and let go on the far one: squads leave both. Then resume the game.',
+    farm: 'Click your field near a village and build a farm: the village will grow faster. Buildings cost gold.',
+    buildings: 'A forge raises soldiers: each is worth two in a fight, but the village grows slower. A watchtower guards everything within its dotted line: only soldiers can take that land, its villages and the tower.',
+    redirect: 'Send a squad to any tile, and while it marches, drag from it to another target: it changes course.',
+    win: "Take the rival's village. Cross the river at the ford, the sandbar. Gather people from several villages.",
+  } satisfies Record<StepId, string>,
+  tutorialDone: 'Tutorial complete',
+  tutorialDoneText: 'Now try a real match: there the rival will not wait.',
+
   victory: 'Victory!',
   defeat: 'Defeat',
   victoryText: 'Every village flies your flag.',
@@ -67,18 +74,6 @@ export type Strings = typeof en
 export const ru: Strings = {
   title: 'Wayfold',
   tagline: 'Каждый поход перекраивает карту',
-  rules: [
-    'В деревнях растут жители. Чем больше вашей земли вокруг деревни, тем быстрее она растёт.',
-    'Тяните от своей деревни к другой деревне или к любой клетке: в путь уходят все жители. Проведите по пути через другие свои деревни, чтобы отправить и их.',
-    'Так же можно схватить идущий отряд и сменить ему курс.',
-    'Отряды перекрашивают каждую клетку, по которой идут. Набеги на землю вокруг вражеских деревень замедляют их рост.',
-    'Земля приносит золото. Нажмите на своё поле возле деревни, чтобы построить там ферму, кузницу или башню.',
-    'Каждая деревня обрабатывает ближайшую к ней землю — свои угодья. Наведите на деревню, чтобы их увидеть.',
-    'Башня охраняет всё внутри точечного контура: эту землю, деревни и саму башню могут взять только солдаты из кузницы.',
-    'Корона отмечает столицу. Если она пала, столицей становится самая большая из оставшихся деревень.',
-    'Масштаб — колесо мыши, щипок на тачпаде или кнопки + и −; чтобы сдвинуть карту, тяните за пустое место.',
-    'Захватите все вражеские деревни, чтобы победить.',
-  ],
   play: 'Играть',
   language: 'Язык',
   mapType: 'Карта',
@@ -114,6 +109,24 @@ export const ru: Strings = {
   back: 'Назад',
   pausedHint: 'Пауза: приказы можно отдавать. Пробел — продолжить.',
   speed: 'Скорость игры',
+
+  tutorial: 'Обучение',
+  skipTutorial: 'Пропустить обучение',
+  next: 'Далее',
+  step: 'Шаг',
+  tutorialSteps: {
+    intro: 'Корона отмечает вашу столицу, соперник живёт за рекой. В деревнях растут жители. Чтобы победить, захватите все вражеские деревни. В обучении соперник не нападает. Масштаб — колесо мыши, щипок на тачпаде или кнопки + и −; чтобы сдвинуть карту, тяните за пустое место.',
+    capture: 'Потяните от столицы к соседней деревне. В путь уйдут все жители; если их больше, чем в деревне, она станет вашей.',
+    land: 'Отряды перекрашивают каждую клетку, по которой идут. Земля приносит золото, а каждая деревня растёт от ближайшей к ней земли — своих угодий. Наведите на деревню, чтобы их увидеть.',
+    pause: 'Нажмите Пробел или «Пауза». Во время паузы можно отдавать приказы: они начнутся, когда игра продолжится.',
+    group: 'Дальняя деревня слишком велика для одной вашей. Потяните от столицы через вторую деревню и отпустите на дальней: отряды выйдут из обеих. Затем продолжите игру.',
+    farm: 'Нажмите на своё поле рядом с деревней и постройте ферму: деревня будет расти быстрее. Постройки стоят золота.',
+    buildings: 'Кузница растит солдат: в бою каждый за двоих, но деревня растёт медленнее. Башня охраняет всё внутри точечного контура: эту землю, деревни и саму башню могут взять только солдаты.',
+    redirect: 'Отправьте отряд к любой клетке и, пока он идёт, потяните от него к другой цели: он сменит курс.',
+    win: 'Захватите деревню соперника. Реку можно перейти по броду — песчаной косе. Соберите людей из нескольких деревень.',
+  },
+  tutorialDone: 'Обучение пройдено',
+  tutorialDoneText: 'Теперь попробуйте настоящую партию: там соперник ждать не будет.',
 
   victory: 'Победа!',
   defeat: 'Поражение',

@@ -1,3 +1,4 @@
+import { readStored, store } from '../storage'
 import { en, ru, type Strings } from './strings'
 
 export type Language = 'en' | 'ru'
@@ -8,7 +9,7 @@ export const LANGUAGE_NAMES: Record<Language, string> = { en: 'English', ru: 'Р
 const DICTIONARIES: Record<Language, Strings> = { en, ru }
 const STORAGE_KEY = 'wayfold.language'
 
-let language: Language = loadLanguage()
+let language: Language = LANGUAGES.find((l) => l === readStored(STORAGE_KEY)) ?? 'en'
 const listeners: (() => void)[] = []
 
 // Texts in the current language; `t` for "translate" is the usual name for this
@@ -24,7 +25,7 @@ export function setLanguage(next: Language): void {
   if (next === language) return
   language = next
   document.documentElement.lang = next
-  saveLanguage(next)
+  store(STORAGE_KEY, next)
   for (const listener of listeners) listener()
 }
 
@@ -32,22 +33,4 @@ export function setLanguage(next: Language): void {
 export function onLanguageChange(listener: () => void): () => void {
   listeners.push(listener)
   return () => listeners.splice(listeners.indexOf(listener), 1)
-}
-
-// The choice is remembered in the browser; storage can be unavailable, e.g. in private mode
-function loadLanguage(): Language {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    return LANGUAGES.find((l) => l === saved) ?? 'en'
-  } catch {
-    return 'en'
-  }
-}
-
-function saveLanguage(value: Language): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, value)
-  } catch {
-    // Not saved: the game still works, the choice is just forgotten on reload
-  }
 }

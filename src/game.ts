@@ -3,6 +3,8 @@ import { createRandom } from './core/rng'
 import { DEFAULT_SETTINGS, type MapSettings, createWorld } from './sim/mapgen'
 import { tick } from './sim/tick'
 import { MAP_SIZES, MAP_TYPES, RIVAL, type World } from './sim/world'
+import { readStored, store } from './storage'
+import { tutorialWorld } from './tutorial/tutorial'
 
 const SETTINGS_KEY = 'wayfold.map'
 
@@ -18,7 +20,7 @@ export class Game {
   paused = true
   started = false // false until a match is started from the menu
   speed = 1 // how many game seconds pass in a real second
-  private rival!: Rival
+  private rival: Rival | null = null // none in the tutorial: the rival there only waits
 
   constructor(seed: number) {
     this.restart(seed)
@@ -30,36 +32,35 @@ export class Game {
     this.rival = new Rival(RIVAL, createRandom(seed + 1), this.settings.difficulty)
   }
 
+  startTutorial(): void {
+    this.world = tutorialWorld()
+    this.started = false
+    this.rival = null
+  }
+
   changeSettings(settings: MatchSettings): void {
     this.settings = settings
-    saveSettings(settings)
+    store(SETTINGS_KEY, JSON.stringify(settings))
   }
 
   update(dt: number): void {
     if (this.paused || this.world.winner !== null) return
-    this.rival.update(this.world, dt)
+    this.rival?.update(this.world, dt)
     tick(this.world, dt)
   }
 }
 
-// The choice is remembered in the browser; storage can be unavailable, e.g. in private mode
+// A saved value that is missing or no longer valid falls back to the default
 function loadSettings(): MatchSettings {
+  let saved: Partial<MatchSettings> = {}
   try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}')
-    return {
-      size: MAP_SIZES.includes(saved.size) ? saved.size : DEFAULT_SETTINGS.size,
-      type: saved.type === 'random' || MAP_TYPES.includes(saved.type) ? saved.type : DEFAULT_SETTINGS.type,
-      difficulty: DIFFICULTIES.includes(saved.difficulty) ? saved.difficulty : 'normal',
-    }
+    saved = JSON.parse(readStored(SETTINGS_KEY) ?? '{}')
   } catch {
-    return { ...DEFAULT_SETTINGS, difficulty: 'normal' }
+    // Not JSON: use the defaults
   }
-}
-
-function saveSettings(settings: MatchSettings): void {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
-  } catch {
-    // Not saved: the game still works, the choice is just forgotten on reload
+  return {
+    size: saved.size && MAP_SIZES.includes(saved.size) ? saved.size : DEFAULT_SETTINGS.size,
+    type: saved.type === 'random' || (saved.type && MAP_TYPES.includes(saved.type)) ? saved.type : DEFAULT_SETTINGS.type,
+    difficulty: saved.difficulty && DIFFICULTIES.includes(saved.difficulty) ? saved.difficulty : 'normal',
   }
 }

@@ -4,7 +4,7 @@ import { estateVillage } from './estates'
 import { fireTowers } from './towers'
 import { BUILDING_COST, GOLD_PER_TILE, SQUAD_SPEED, TICK_SECONDS } from './rules'
 import { sendSquad } from './squads'
-import { addVillage, testWorld } from './testWorld.testing'
+import { addVillage, handmadeWorld } from './handmade'
 import { tick } from './tick'
 import { growthRate } from './villages'
 import { HUMAN, RIVAL, type World } from './world'
@@ -21,7 +21,7 @@ function own(world: World, owner: typeof HUMAN | typeof RIVAL, ...cells: [number
 
 describe('estates', () => {
   it('give each tile to the nearest own village, the longer-held one on a tie', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const left = addVillage(world, 0, 0, HUMAN, 1)
     const right = addVillage(world, 4, 0, HUMAN, 1)
     right.capturedAt = 30
@@ -36,7 +36,7 @@ describe('estates', () => {
 
 describe('gold', () => {
   it('comes from every own tile', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     addVillage(world, 0, 0, HUMAN, 1)
     addVillage(world, 6, 2, RIVAL, 1)
     own(world, HUMAN, [1, 0], [2, 0], [3, 0])
@@ -47,7 +47,7 @@ describe('gold', () => {
 
 describe('buildings', () => {
   function startingWorld(): World {
-    const world = testWorld(['..f....', '......', '.......'])
+    const world = handmadeWorld(['..f....', '......', '.......'])
     addVillage(world, 0, 0, HUMAN, 10)
     addVillage(world, 6, 2, RIVAL, 10)
     own(world, HUMAN, [1, 0], [2, 0], [1, 1])
@@ -116,7 +116,7 @@ describe('buildings', () => {
 
 describe('tower volleys', () => {
   it('take a tenth of a big squad, at least one person', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     addVillage(world, 0, 0, HUMAN, 1)
     const enemy = addVillage(world, 6, 2, RIVAL, 40)
     own(world, HUMAN, [1, 1])
@@ -132,7 +132,7 @@ describe('tower volleys', () => {
 describe('tower zones', () => {
   // Your village with a tower next to it; the rival marches 30 people from the far corner
   function guardedWorld(soldiers: boolean) {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     const village = addVillage(world, 0, 0, HUMAN, 3)
     const enemy = addVillage(world, 6, 2, RIVAL, 30)
     const tower = world.map.cellAtOffset(1, 1)!
@@ -181,7 +181,7 @@ describe('tower zones', () => {
 
 describe('tower placement', () => {
   it('is not allowed within two tiles of an enemy village', () => {
-    const world = testWorld(FIELD)
+    const world = handmadeWorld(FIELD)
     addVillage(world, 0, 1, HUMAN, 10)
     addVillage(world, 4, 1, RIVAL, 10)
     own(world, HUMAN, [1, 1], [2, 1])

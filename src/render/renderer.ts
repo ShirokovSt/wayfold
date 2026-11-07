@@ -4,7 +4,7 @@ import { type Cell, HUMAN, type Squad, type World } from '../sim/world'
 import { drawDecor, drawEstates, drawGround, drawTable, drawTerritory, drawTowerZones, hexPath, tileCenter } from './board'
 import { TOWER_TOP, drawArrow, drawBadge, drawBuilding, drawCrown, drawPerson, drawVillage } from './figures'
 import { Layout } from './layout'
-import { ownerTone } from './palette'
+import { GOLD, ownerTone } from './palette'
 
 // Where the walkers of a squad stand around its position, in tile sizes; at most this many are drawn
 const FORMATION = [
@@ -23,6 +23,7 @@ export interface View {
   hover: Cell | null // the tile under the pointer
   selected: Cell | null // the tile the build menu is open for
   showRoutes: boolean // on pause: where your squads are heading
+  marked: Cell[] // tiles the tutorial points at
 }
 
 export class Renderer {
@@ -86,6 +87,13 @@ export class Renderer {
       ctx.lineWidth = size * 0.08
       ctx.strokeStyle = ownerTone(HUMAN).light
       hexPath(ctx, tileCenter(this.layout, view.selected), size * 0.86)
+      ctx.stroke()
+    }
+    // A slow pulse, so the eye finds them without them getting in the way
+    ctx.lineWidth = size * (0.08 + 0.03 * Math.sin(time * 4))
+    ctx.strokeStyle = GOLD.main
+    for (const cell of view.marked) {
+      hexPath(ctx, tileCenter(this.layout, cell), size * 0.92)
       ctx.stroke()
     }
 

@@ -420,7 +420,8 @@ button.primary:hover {
   justify-content: space-between;
 }
 
-.card .actions > button:not(.primary) {
+.card .actions > button:not(.primary),
+.tutorial .actions > button:not(.primary) {
   color: var(--ink);
   background: transparent;
   border-color: #c9b791;
@@ -429,4 +430,46 @@ button.primary:hover {
 .actions.centered {
   justify-content: center;
   gap: 10px;
+}
+
+/* Tutorial: the current step in the lower corner, away from the pause banner at the top */
+
+.tutorial {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  width: min(340px, calc(100% - 24px));
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.45;
+  box-shadow: 0 4px 0 #c9b791, 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+
+.tutorial[hidden] {
+  display: none;
+}
+
+.tutorial p {
+  margin: 0;
+}
+
+.tutorial .step {
+  margin-bottom: 6px;
+  color: #7d6a52;
+  font-size: 13px;
+}
+
+.tutorial .actions {
+  margin-top: 12px;
+  gap: 8px;
+}
+
+.tutorial .actions > button:only-child {
+  margin-left: auto;
+}
+
+.tutorial button.primary {
+  padding: 5px 16px;
 }

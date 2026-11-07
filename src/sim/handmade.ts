@@ -1,12 +1,14 @@
 import { GameMap } from './map'
 import { type Owner, type Terrain, type Village, type World, newWorld } from './world'
 
-// Small hand-made worlds for tests; `rows` draws the terrain: . field, f forest, m mountain, w water, o ford
-export function testWorld(rows: string[]): World {
+const TERRAIN: Record<string, Terrain> = { '.': 'field', f: 'forest', m: 'mountain', w: 'water', o: 'ford' }
+
+// Worlds drawn by hand, for the tutorial and for tests; `rows` draws the terrain:
+// . field, f forest, m mountain, w water, o ford (odd rows are one tile shorter)
+export function handmadeWorld(rows: string[]): World {
   const map = new GameMap(rows[0].length, rows.length)
-  const terrain: Record<string, Terrain> = { '.': 'field', f: 'forest', m: 'mountain', w: 'water', o: 'ford' }
   for (const [row, line] of rows.entries()) {
-    for (let col = 0; col < map.rowLength(row); col++) map.cellAtOffset(col, row)!.terrain = terrain[line[col]]
+    for (let col = 0; col < map.rowLength(row); col++) map.cellAtOffset(col, row)!.terrain = TERRAIN[line[col]]
   }
   return newWorld(map, [])
 }
