@@ -58,6 +58,9 @@ describe('tutorial', () => {
     const [, , , village, capital] = world.villages
     expect(isGuarded(world, village.cell, HUMAN)).toBe(false)
     expect(isGuarded(world, capital.cell, HUMAN)).toBe(true)
+    // The way from your capital to the open village stays out of the tower's reach
+    const path = findPath(world.map, world.villages[0].cell, village.cell)!
+    expect(path.some((cell) => isGuarded(world, cell, HUMAN))).toBe(false)
   })
 
   it('can be played to the end against the waiting rival', () => {

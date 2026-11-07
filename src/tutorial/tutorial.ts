@@ -35,12 +35,12 @@ export function tutorialWorld(): World {
   claimAround(world.map, capital, START_LAND_RADIUS)
   claimAround(world.map, enemyVillage, CAPTURE_LAND_RADIUS)
   claimAround(world.map, enemyCapital, START_LAND_RADIUS)
-  world.map.cellAtOffset(10, 6)!.building = { kind: 'tower', reload: 0 }
+  world.map.cellAtOffset(12, 6)!.building = { kind: 'tower', reload: 0 } // behind the capital, off the way to the village
   world.gold[HUMAN] = START_GOLD
   return world
 }
 
-export type StepId = 'intro' | 'capture' | 'land' | 'pause' | 'group' | 'farm' | 'town' | 'redirect' | 'enemy' | 'tower'
+export type StepId = 'intro' | 'capture' | 'land' | 'pause' | 'group' | 'farm' | 'redirect' | 'enemy' | 'town' | 'tower'
 
 // A step is done when the player does what it asks; steps without `done` wait for the Next button
 export interface Step {
@@ -56,9 +56,9 @@ export const STEPS: Step[] = [
   { id: 'pause', marked: [], done: (_, paused) => paused },
   { id: 'group', marked: [CAPITAL, NEAR, FAR], done: (world) => world.villages[FAR].owner === HUMAN },
   { id: 'farm', marked: [], done: (world) => world.map.cells.some((cell) => isOwnFarm(cell)) },
-  { id: 'town', marked: [CAPITAL], done: (world) => world.villages.some((v) => v.owner === HUMAN && v.town) },
   { id: 'redirect', marked: [], done: (world) => world.squads.some((s) => s.owner === HUMAN && s.start !== null) },
   { id: 'enemy', marked: [ENEMY_VILLAGE], done: (world) => world.villages[ENEMY_VILLAGE].owner === HUMAN },
+  { id: 'town', marked: [CAPITAL], done: (world) => world.villages.some((v) => v.owner === HUMAN && v.town) },
   { id: 'tower', marked: [ENEMY_CAPITAL], done: (world) => world.winner === HUMAN },
 ]
 
