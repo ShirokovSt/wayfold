@@ -2,6 +2,7 @@ import { hexDistance, hexToPoint } from '../core/hex'
 import { findPath } from './pathfind'
 import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, MOVE_COST, SOLDIER_STRENGTH, SQUAD_SPEED } from './rules'
 import { claimAround, paint } from './territory'
+import { canTake } from './towers'
 import { ensureCapital, hasForge } from './villages'
 import type { Cell, PlayerId, Squad, Village, World } from './world'
 
@@ -56,7 +57,8 @@ export function moveSquads(world: World, dt: number): void {
       squad.step++
       squad.progress -= 1
     }
-    paint(squadCell(squad), squad.owner)
+    const cell = squadCell(squad)
+    if (canTake(world, squad, cell)) paint(cell, squad.owner)
     if (squad.step === squad.path.length - 1) arrive(world, squad)
     placeSquad(squad)
   }
@@ -110,6 +112,11 @@ function enterVillage(world: World, squad: Squad, village: Village): void {
     village.population += squad.count
     return
   }
+  // Peasants can beat the garrison of a guarded village, but only soldiers can move in
+  if (!canTake(world, squad, village.cell)) {
+    village.population = Math.max(0, village.population - power(squad))
+    return
+  }
   village.population -= power(squad)
   if (village.population < 0) {
     const loser = village.owner
@@ -117,7 +124,7 @@ function enterVillage(world: World, squad: Squad, village: Village): void {
     village.population = -village.population / squad.strength // the survivors move in
     village.capturedAt = world.time
     village.capital = false // a captured capital becomes an ordinary village
-    claimAround(world.map, village, CAPTURE_LAND_RADIUS)
+    claimAround(world.map, village, CAPTURE_LAND_RADIUS, (cell) => canTake(world, squad, cell))
     if (loser !== null) ensureCapital(world, loser, village.cell)
     ensureCapital(world, squad.owner, village.cell)
   }

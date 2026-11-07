@@ -1,7 +1,7 @@
 import type { Drag } from '../input/pointer'
 import { ARROW_SECONDS } from '../sim/towers'
 import { type Cell, HUMAN, type Squad, type World } from '../sim/world'
-import { drawDecor, drawEstates, drawGround, drawTable, drawTerritory, hexPath, tileCenter } from './board'
+import { drawDecor, drawEstates, drawGround, drawTable, drawTerritory, drawTowerZones, hexPath, tileCenter } from './board'
 import { TOWER_TOP, drawArrow, drawBadge, drawBuilding, drawCrown, drawPerson, drawVillage } from './figures'
 import { Layout } from './layout'
 import { ownerTone } from './palette'
@@ -69,6 +69,7 @@ export class Renderer {
     drawTerritory(ctx, this.world.map, this.layout)
     const hovered = view.hover?.village
     drawEstates(ctx, this.world, this.layout, hovered?.owner === HUMAN ? hovered : null)
+    drawTowerZones(ctx, this.world, this.layout, view.hover)
     ctx.drawImage(this.decor, 0, 0, this.width, this.height)
     if (view.selected) {
       ctx.lineWidth = size * 0.08

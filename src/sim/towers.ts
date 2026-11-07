@@ -1,6 +1,6 @@
-import { SQRT3, hexToPoint } from '../core/hex'
+import { SQRT3, hexDistance, hexToPoint } from '../core/hex'
 import { TOWER_RANGE, TOWER_RELOAD, TOWER_VOLLEY } from './rules'
-import type { Squad, World } from './world'
+import type { Cell, PlayerId, Squad, World } from './world'
 
 export const ARROW_SECONDS = 0.35 // how long an arrow is drawn flying
 
@@ -31,4 +31,27 @@ export function fireTowers(world: World, dt: number): void {
     world.arrows.push({ from, to: { x: target.x, y: target.y }, age: 0 })
   }
   world.squads = world.squads.filter((squad) => squad.count > 0)
+}
+
+// Everything within a tower's range that is its owner's or nobody's is guarded:
+// tiles, villages and the tower itself can be taken from there only by soldiers
+export function isGuarded(world: World, cell: Cell, against: PlayerId): boolean {
+  if (cell.owner === against) return false
+  return world.map.cells.some(
+    (tower) =>
+      tower.building?.kind === 'tower' &&
+      tower.owner !== null &&
+      tower.owner !== against &&
+      (cell.owner === tower.owner || cell.owner === null) &&
+      hexDistance(tower.hex, cell.hex) <= TOWER_RANGE,
+  )
+}
+
+export function isSoldiers(squad: Squad): boolean {
+  return squad.strength > 1
+}
+
+// Whether the squad can repaint the tile or take the village on it
+export function canTake(world: World, squad: Squad, cell: Cell): boolean {
+  return isSoldiers(squad) || !isGuarded(world, cell, squad.owner)
 }

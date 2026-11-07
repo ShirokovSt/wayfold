@@ -128,3 +128,67 @@ describe('tower volleys', () => {
     expect(squad.count).toBe(36)
   })
 })
+
+describe('tower zones', () => {
+  // Your village with a tower next to it; the rival marches 30 people from the far corner
+  function guardedWorld(soldiers: boolean) {
+    const world = testWorld(FIELD)
+    const village = addVillage(world, 0, 0, HUMAN, 3)
+    const enemy = addVillage(world, 6, 2, RIVAL, 30)
+    const tower = world.map.cellAtOffset(1, 1)!
+    own(world, HUMAN, [1, 1])
+    tower.building = { kind: 'tower', reload: 0 }
+    const march = (target: [number, number]) => {
+      const squad = sendSquad(world, RIVAL, enemy, world.map.cellAtOffset(...target)!)!
+      if (soldiers) squad.strength = 2
+      run(world, 9 / SQUAD_SPEED)
+    }
+    return { world, village, tower, march }
+  }
+
+  it('peasants cannot repaint guarded land, soldiers can', () => {
+    const peasants = guardedWorld(false)
+    peasants.march([2, 0])
+    expect(peasants.world.map.cellAtOffset(2, 0)!.owner).toBe(null)
+
+    const soldiers = guardedWorld(true)
+    soldiers.march([2, 0])
+    expect(soldiers.world.map.cellAtOffset(2, 0)!.owner).toBe(RIVAL)
+  })
+
+  it('peasants only beat the garrison of a guarded village, soldiers take it', () => {
+    const peasants = guardedWorld(false)
+    peasants.march([0, 0])
+    expect(peasants.village.owner).toBe(HUMAN)
+    expect(peasants.village.population).toBeLessThan(1)
+
+    const soldiers = guardedWorld(true)
+    soldiers.march([0, 0])
+    expect(soldiers.village.owner).toBe(RIVAL)
+  })
+
+  it('only soldiers take the tower itself', () => {
+    const peasants = guardedWorld(false)
+    peasants.march([1, 1])
+    expect(peasants.tower.owner).toBe(HUMAN)
+
+    const soldiers = guardedWorld(true)
+    soldiers.march([1, 1])
+    expect(soldiers.tower.owner).toBe(RIVAL)
+    expect(soldiers.tower.building?.kind).toBe('tower')
+  })
+})
+
+describe('tower placement', () => {
+  it('is not allowed within two tiles of an enemy village', () => {
+    const world = testWorld(FIELD)
+    addVillage(world, 0, 1, HUMAN, 10)
+    addVillage(world, 4, 1, RIVAL, 10)
+    own(world, HUMAN, [1, 1], [2, 1])
+    world.gold[HUMAN] = 100
+    const doorstep = world.map.cellAtOffset(2, 1)! // two steps from the rival
+    expect(build(world, HUMAN, doorstep, 'tower')).toBe(false)
+    expect(build(world, HUMAN, doorstep, 'farm')).toBe(true)
+    expect(build(world, HUMAN, world.map.cellAtOffset(1, 1)!, 'tower')).toBe(true) // three steps away
+  })
+})

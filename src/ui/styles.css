@@ -243,6 +243,18 @@ button.primary:hover {
   height: 44px;
 }
 
+.build-menu .note {
+  max-width: 76px;
+  color: #a33a2f;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.build-menu .note:empty {
+  display: none;
+}
+
 .build-menu .cost {
   display: flex;
   align-items: center;

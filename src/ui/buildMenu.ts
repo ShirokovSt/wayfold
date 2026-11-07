@@ -3,7 +3,7 @@ import { onLanguageChange, t } from '../i18n'
 import { drawBuilding } from '../render/figures'
 import type { Layout } from '../render/layout'
 import { ownerTone } from '../render/palette'
-import { build, canBuildOn } from '../sim/economy'
+import { build, canBuild, canBuildOn } from '../sim/economy'
 import { BUILDING_COST } from '../sim/rules'
 import { BUILDING_KINDS, type BuildingKind, type Cell, HUMAN } from '../sim/world'
 import { element } from './dom'
@@ -50,7 +50,11 @@ export class BuildMenu {
       this.close()
       return
     }
-    for (const [kind, button] of this.buttons) button.disabled = world.gold[HUMAN] < BUILDING_COST[kind]
+    for (const [kind, button] of this.buttons) {
+      const allowed = canBuild(world, HUMAN, this.cell, kind)
+      button.disabled = !allowed || world.gold[HUMAN] < BUILDING_COST[kind]
+      button.querySelector('.note')!.textContent = allowed ? '' : t().tooCloseToEnemy
+    }
   }
 
   private render(): void {
@@ -61,7 +65,7 @@ export class BuildMenu {
 
   private button(kind: BuildingKind): HTMLButtonElement {
     const node = element('button', 'building', icon(kind), element('b', '', t().buildings[kind]))
-    node.append(element('span', 'cost', element('i', 'coin'), String(BUILDING_COST[kind])))
+    node.append(element('span', 'cost', element('i', 'coin'), String(BUILDING_COST[kind])), element('small', 'note'))
     node.type = 'button'
     node.title = t().buildingHints[kind]
     node.addEventListener('click', () => {

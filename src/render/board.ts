@@ -2,6 +2,7 @@ import { DIRECTIONS, type Point, addHex, hexCorner } from '../core/hex'
 import { type Random, createRandom } from '../core/rng'
 import type { GameMap } from '../sim/map'
 import { estateTiles, estateVillage } from '../sim/estates'
+import { TOWER_RANGE } from '../sim/rules'
 import type { Cell, Village, World } from '../sim/world'
 import { type Layout, TILE_DEPTH } from './layout'
 import { LEAVES, ROCK, SHADOW, TABLE, TERRAIN, WOOD, ownerTone } from './palette'
@@ -298,6 +299,46 @@ export function drawEstates(ctx: CanvasRenderingContext2D, world: World, layout:
       ctx.moveTo(a.x, a.y)
       ctx.lineTo(b.x, b.y)
     })
+    ctx.stroke()
+  }
+  ctx.setLineDash([])
+  ctx.lineCap = 'butt'
+}
+
+// A dotted outline around every tower's guarded zone; the hovered tower's zone is lit up
+export function drawTowerZones(ctx: CanvasRenderingContext2D, world: World, layout: Layout, lit: Cell | null): void {
+  const size = layout.size
+  for (const tower of world.map.cells) {
+    if (tower.building?.kind !== 'tower' || tower.owner === null) continue
+    const tone = ownerTone(tower.owner)
+    const zone = new Set(world.map.within(tower, TOWER_RANGE))
+
+    if (tower === lit) {
+      ctx.globalAlpha = 0.3
+      ctx.fillStyle = tone.light
+      for (const cell of zone) {
+        hexPath(ctx, tileCenter(layout, cell), size * FACE * 0.97)
+        ctx.fill()
+      }
+      ctx.globalAlpha = 1
+    }
+
+    ctx.setLineDash([size * 0.01, size * 0.17])
+    ctx.lineCap = 'round'
+    ctx.lineWidth = size * 0.1
+    ctx.strokeStyle = tone.dark
+    ctx.beginPath()
+    for (const cell of zone) {
+      const center = tileCenter(layout, cell)
+      DIRECTIONS.forEach((direction, i) => {
+        const neighbor = world.map.cellAt(addHex(cell.hex, direction))
+        if (neighbor && zone.has(neighbor)) return
+        const a = hexCorner(center, size * 0.86, i)
+        const b = hexCorner(center, size * 0.86, i + 1)
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+      })
+    }
     ctx.stroke()
   }
   ctx.setLineDash([])

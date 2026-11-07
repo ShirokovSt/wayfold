@@ -1,10 +1,11 @@
 import { hexDistance } from '../core/hex'
 import type { Random } from '../core/rng'
-import { build, canBuildOn } from '../sim/economy'
+import { build, canBuild } from '../sim/economy'
 import { estateBuildings, estateTiles } from '../sim/estates'
 import { findPath, pathDuration } from '../sim/pathfind'
-import { BUILDING_COST, POPULATION_CAP } from '../sim/rules'
+import { BUILDING_COST, POPULATION_CAP, SOLDIER_STRENGTH } from '../sim/rules'
 import { sendSquad, squadTarget } from '../sim/squads'
+import { isGuarded } from '../sim/towers'
 import { growthRate, hasForge } from '../sim/villages'
 import { type BuildingKind, type Cell, type PlayerId, type Village, type World, opponent } from '../sim/world'
 
@@ -54,7 +55,7 @@ export class Rival {
 
   // Towers go toward the enemy, farms and forges close to home
   private buildSpot(world: World, village: Village, kind: BuildingKind): Cell | null {
-    const spots = estateTiles(world, village).filter((cell) => canBuildOn(world, this.player, cell))
+    const spots = estateTiles(world, village).filter((cell) => canBuild(world, this.player, cell, kind))
     const enemy = this.enemyVillages(world)
     const score = (cell: Cell) =>
       kind === 'tower' && enemy.length > 0
@@ -89,32 +90,36 @@ export class Rival {
     return false
   }
 
-  // Picks the cheapest and closest village it can surely take
+  // Picks the cheapest and closest village it can surely take; guarded ones only with soldiers
   private capture(world: World): boolean {
     let best: { from: Village; to: Village; score: number } | null = null
     for (const from of this.villages(world)) {
+      const soldiers = hasForge(world, from)
       for (const to of world.villages) {
-        if (to.owner === this.player) continue
+        if (to.owner === this.player || (!soldiers && isGuarded(world, to.cell, this.player))) continue
         const path = findPath(world.map, from.cell, to.cell)
         if (!path) continue
         const time = pathDuration(path)
         const needed = to.population + growthRate(world, to) * time + SAFETY_MARGIN -
           incoming(world, to, (owner) => owner === this.player)
+        const strength = from.population * (soldiers ? SOLDIER_STRENGTH : 1)
         const score = time + needed * 0.3
-        if (from.population >= needed && (!best || score < best.score)) best = { from, to, score }
+        if (strength >= needed && (!best || score < best.score)) best = { from, to, score }
       }
     }
     return best !== null && sendSquad(world, this.player, best.from, best.to.cell) !== null
   }
 
-  // A full village with nothing to take marches over the nearest enemy land and back
+  // A full village with nothing to take marches over the nearest enemy land and back:
+  // soldiers go for enemy towers first, peasants only where land is not guarded
   private raid(world: World): boolean {
     const full = this.villages(world).find((village) => village.population >= POPULATION_CAP * 0.8)
     if (!full) return false
-    const target = nearest(
-      world.map.cells.filter((cell) => cell.owner !== null && cell.owner !== this.player && !cell.village),
-      full.cell,
-    )
+    const soldiers = hasForge(world, full)
+    const enemyLand = world.map.cells.filter((cell) => cell.owner !== null && cell.owner !== this.player && !cell.village)
+    const towers = enemyLand.filter((cell) => cell.building?.kind === 'tower')
+    const open = enemyLand.filter((cell) => !isGuarded(world, cell, this.player))
+    const target = nearest(soldiers && towers.length > 0 ? towers : soldiers ? enemyLand : open, full.cell)
     return target !== null && sendSquad(world, this.player, full, target) !== null
   }
 

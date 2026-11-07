@@ -10,6 +10,7 @@ export const en = {
     'Squads repaint every tile they walk across. Raid the land around enemy villages to slow them down.',
     'Your land brings gold. Click your field near a village to build a farm, a forge or a watchtower there.',
     'Each village works the land closest to it: its estate. Hover a village to see it.',
+    'A watchtower guards everything within the dotted line: only soldiers from a forge can take that land, its villages and the tower.',
     'The crown marks a capital. When it falls, the largest remaining village takes its place.',
     'Take every enemy village to win.',
   ],
@@ -22,12 +23,13 @@ export const en = {
   people: 'People',
   land: 'Land',
   gold: 'Gold',
+  tooCloseToEnemy: 'Too close to an enemy village',
 
   buildings: { farm: 'Farm', forge: 'Forge', tower: 'Watchtower' } satisfies Record<BuildingKind, string>,
   buildingHints: {
     farm: 'Its village grows faster.',
     forge: 'Its village raises soldiers: each is worth two in a fight, but the village grows slower.',
-    tower: 'Shoots enemy squads within two tiles: every second a volley takes a tenth of the squad.',
+    tower: 'Guards everything within two tiles: only soldiers can take that land, its villages and the tower. Every second a volley takes a tenth of an enemy squad. Cannot stand within two tiles of an enemy village.',
   } satisfies Record<BuildingKind, string>,
 
   pause: 'Pause',
@@ -57,6 +59,7 @@ export const ru: Strings = {
     'Отряды перекрашивают каждую клетку, по которой идут. Набеги на землю вокруг вражеских деревень замедляют их рост.',
     'Земля приносит золото. Нажмите на своё поле возле деревни, чтобы построить там ферму, кузницу или башню.',
     'Каждая деревня обрабатывает ближайшую к ней землю — свои угодья. Наведите на деревню, чтобы их увидеть.',
+    'Башня охраняет всё внутри точечного контура: эту землю, деревни и саму башню могут взять только солдаты из кузницы.',
     'Корона отмечает столицу. Если она пала, столицей становится самая большая из оставшихся деревень.',
     'Захватите все вражеские деревни, чтобы победить.',
   ],
@@ -69,12 +72,13 @@ export const ru: Strings = {
   people: 'Жители',
   land: 'Земля',
   gold: 'Золото',
+  tooCloseToEnemy: 'Слишком близко к чужой деревне',
 
   buildings: { farm: 'Ферма', forge: 'Кузница', tower: 'Башня' },
   buildingHints: {
     farm: 'Деревня растёт быстрее.',
     forge: 'Деревня растит солдат: в бою каждый за двоих, но рост медленнее.',
-    tower: 'Стреляет по вражеским отрядам в двух клетках вокруг: каждую секунду залп уносит десятую часть отряда.',
+    tower: 'Охраняет всё в двух клетках вокруг: эту землю, деревни и саму башню могут взять только солдаты. Каждую секунду залп уносит десятую часть вражеского отряда. Нельзя ставить ближе двух клеток к чужой деревне.',
   },
 
   pause: 'Пауза',

@@ -32,11 +32,11 @@ export const ESTATE_RADIUS = 3
 
 export const GOLD_PER_TILE = 0.05 // gold per second for every own tile, wherever it is
 
-export const BUILDING_COST: Record<BuildingKind, number> = { farm: 30, tower: 35, forge: 50 }
+export const BUILDING_COST: Record<BuildingKind, number> = { farm: 30, tower: 45, forge: 50 }
 export const FARM_GROWTH = 0.25 // extra people per second for the village whose estate has the farm
 export const FORGE_GROWTH = 0.67 // a village with a forge grows slower...
 export const SOLDIER_STRENGTH = 2 // ...but its people fight as soldiers worth two
-export const TOWER_RANGE = 2 // tiles
+export const TOWER_RANGE = 2 // tiles it shoots and guards: only soldiers can take land there
 export const TOWER_RELOAD = 1 // seconds between volleys
 export const TOWER_VOLLEY = 0.1 // share of the squad a volley takes, at least one person
 

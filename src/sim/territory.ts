@@ -8,9 +8,10 @@ export function paint(cell: Cell, owner: PlayerId): void {
   cell.owner = owner
 }
 
-export function claimAround(map: GameMap, village: Village, radius: number): void {
+// The village tile always follows its village; the tiles around only where `canClaim` allows
+export function claimAround(map: GameMap, village: Village, radius: number, canClaim = (_: Cell) => true): void {
   for (const cell of map.within(village.cell, radius)) {
-    if (isPassable(cell) && (!cell.village || cell === village.cell)) cell.owner = village.owner
+    if (cell === village.cell || (isPassable(cell) && !cell.village && canClaim(cell))) cell.owner = village.owner
   }
 }
 
