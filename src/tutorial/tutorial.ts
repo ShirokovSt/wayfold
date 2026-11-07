@@ -18,7 +18,7 @@ const ROWS = [
 
 // Village ids in the tutorial world, in the order they are placed
 const CAPITAL = 0
-const NEAR = 1 // takes one squad from the capital
+const NEAR = 1 // takes all the capital's people, but not half of them
 const FAR = 2 // needs two villages together
 const ENEMY = 3
 const START_GOLD = 20
@@ -26,7 +26,7 @@ const START_GOLD = 20
 export function tutorialWorld(): World {
   const world = handmadeWorld(ROWS)
   const capital = addVillage(world, 2, 4, HUMAN, 12, true)
-  addVillage(world, 4, 2, null, 6)
+  addVillage(world, 4, 2, null, 8)
   addVillage(world, 5, 6, null, 20)
   const enemy = addVillage(world, 9, 4, RIVAL, 14, true)
   claimAround(world.map, capital, START_LAND_RADIUS)

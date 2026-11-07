@@ -27,6 +27,15 @@ describe('squads', () => {
     for (let col = 1; col <= 3; col++) expect(world.map.cellAtOffset(col, 0)!.owner).toBe(HUMAN)
   })
 
+  it('can take half of the people, leaving the rest at home', () => {
+    const world = handmadeWorld(FIELD)
+    const home = addVillage(world, 0, 0, HUMAN, 7.6)
+    expect(sendSquad(world, HUMAN, home, world.map.cellAtOffset(6, 0)!, 'half')!.count).toBe(3)
+    expect(home.population).toBeCloseTo(4.6)
+    const lone = addVillage(world, 0, 2, HUMAN, 1)
+    expect(sendSquad(world, HUMAN, lone, world.map.cellAtOffset(6, 0)!, 'half')!.count).toBe(1)
+  })
+
   it('return home after a raid on open land', () => {
     const world = handmadeWorld(FIELD)
     const home = addVillage(world, 0, 0, HUMAN, 5)

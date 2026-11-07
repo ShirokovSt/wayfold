@@ -2,7 +2,7 @@ import type { Point } from '../core/hex'
 import type { Game } from '../game'
 import type { Layout } from '../render/layout'
 import { findPath } from '../sim/pathfind'
-import { redirectSquad, sendSquad, squadCell } from '../sim/squads'
+import { type Share, redirectSquad, sendSquad, squadCell } from '../sim/squads'
 import { type Cell, HUMAN, type Squad, type Village } from '../sim/world'
 
 const SQUAD_GRAB_RADIUS = 0.6 // how close to a squad (in hex radii) a press picks it up
@@ -14,9 +14,11 @@ export interface Drag {
   squads: Squad[]
   target: Cell | null
   paths: Cell[][] // the route of every member that can reach the target
+  share: Share // everyone in each village goes, or half while Shift is held
 }
 
-// Press on your village or squad, sweep over more of them, release on the target: they all set off.
+// Press on your village or squad, sweep over more of them, release on the target: they all set off,
+// all of each village's people, or half of them with Shift held.
 // Dragging empty ground moves the map, two fingers on a touch screen zoom it,
 // and a plain click on any other tile is passed on, e.g. to open the build menu
 export class PointerInput {
@@ -44,6 +46,12 @@ export class PointerInput {
       this.pan = null
     })
     canvas.addEventListener('pointerleave', () => (this.hover = null))
+    // Shift can be pressed or let go in the middle of a drag
+    for (const type of ['keydown', 'keyup'] as const) {
+      window.addEventListener(type, (event) => {
+        if (this.drag && event.key === 'Shift') this.drag.share = event.shiftKey ? 'half' : 'all'
+      })
+    }
   }
 
   private press(event: PointerEvent): void {
@@ -54,7 +62,7 @@ export class PointerInput {
       this.startPinch()
       return
     }
-    this.drag = { villages: [], squads: [], target: null, paths: [] }
+    this.drag = { villages: [], squads: [], target: null, paths: [], share: shareOf(event) }
     // Orders work during the pause too: plan calmly, then let it run
     if (this.game.world.winner !== null || !this.gather(event)) {
       this.drag = null
@@ -85,6 +93,7 @@ export class PointerInput {
     const drag = this.drag
     this.canvas.style.cursor = drag || this.ownVillageAt(event) || this.ownSquadAt(event) ? 'pointer' : 'default'
     if (!drag) return
+    drag.share = shareOf(event)
     const joined = this.gather(event)
     if (joined || cell !== drag.target) {
       drag.target = cell
@@ -108,7 +117,7 @@ export class PointerInput {
     const world = this.game.world
     // The village you release on is the destination, not a member of the group
     for (const village of drag.villages) {
-      if (village.cell !== drag.target) sendSquad(world, HUMAN, village, drag.target)
+      if (village.cell !== drag.target) sendSquad(world, HUMAN, village, drag.target, shareOf(event))
     }
     for (const squad of drag.squads) redirectSquad(world, HUMAN, squad, drag.target)
   }
@@ -187,4 +196,8 @@ export class PointerInput {
     const rect = this.canvas.getBoundingClientRect()
     return [event.clientX - rect.left, event.clientY - rect.top]
   }
+}
+
+function shareOf(event: PointerEvent): Share {
+  return event.shiftKey ? 'half' : 'all'
 }

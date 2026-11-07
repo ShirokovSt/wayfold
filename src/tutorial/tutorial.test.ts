@@ -3,7 +3,7 @@ import { Rival } from '../ai/rival'
 import { createRandom } from '../core/rng'
 import { findPath } from '../sim/pathfind'
 import { TICK_SECONDS } from '../sim/rules'
-import { sendSquad } from '../sim/squads'
+import { sendSquad, squadSize } from '../sim/squads'
 import { tick } from '../sim/tick'
 import { HUMAN, type World } from '../sim/world'
 import { STEPS, tutorialWorld } from './tutorial'
@@ -21,6 +21,13 @@ describe('tutorial', () => {
   it('every village can be reached from the capital', () => {
     const world = tutorialWorld()
     for (const village of world.villages) expect(findPath(world.map, world.villages[0].cell, village.cell)).not.toBeNull()
+  })
+
+  it('the near village needs all of the capital, not half', () => {
+    const world = tutorialWorld()
+    const [capital, near] = world.villages
+    expect(squadSize(capital.population, 'half')).toBeLessThan(near.population)
+    expect(squadSize(capital.population, 'all')).toBeGreaterThan(near.population)
   })
 
   it('the capital takes the near village with one squad', () => {

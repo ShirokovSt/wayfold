@@ -49,7 +49,7 @@ export const en = {
   step: 'Step',
   tutorialSteps: {
     intro: 'The crown marks your capital; the rival lives across the river. Villages raise people. Take every enemy village to win. In the tutorial the rival does not attack. Zoom with the mouse wheel, a touchpad pinch or the + and − buttons; drag empty ground to move the map.',
-    capture: 'Drag from your capital to the village next to it. All its people set off; if they outnumber the village, it becomes yours.',
+    capture: 'Drag from your capital to the village next to it. All its people set off; if they outnumber the village, it becomes yours. Hold Shift to send only half, so the village is not left empty.',
     land: 'Squads repaint every tile they walk across. Land brings gold, and each village grows from the land closest to it: its estate. Hover a village to see it.',
     pause: 'Press Space or Pause. While paused you can still give orders: they start when the game resumes.',
     group: 'The far village is too big for one of yours. Drag from your capital over your second village and let go on the far one: squads leave both. Then resume the game.',
@@ -116,7 +116,7 @@ export const ru: Strings = {
   step: 'Шаг',
   tutorialSteps: {
     intro: 'Корона отмечает вашу столицу, соперник живёт за рекой. В деревнях растут жители. Чтобы победить, захватите все вражеские деревни. В обучении соперник не нападает. Масштаб — колесо мыши, щипок на тачпаде или кнопки + и −; чтобы сдвинуть карту, тяните за пустое место.',
-    capture: 'Потяните от столицы к соседней деревне. В путь уйдут все жители; если их больше, чем в деревне, она станет вашей.',
+    capture: 'Потяните от столицы к соседней деревне. В путь уйдут все жители; если их больше, чем в деревне, она станет вашей. Удерживайте Shift, чтобы отправить только половину и не оставлять деревню без защиты.',
     land: 'Отряды перекрашивают каждую клетку, по которой идут. Земля приносит золото, а каждая деревня растёт от ближайшей к ней земли — своих угодий. Наведите на деревню, чтобы их увидеть.',
     pause: 'Нажмите Пробел или «Пауза». Во время паузы можно отдавать приказы: они начнутся, когда игра продолжится.',
     group: 'Дальняя деревня слишком велика для одной вашей. Потяните от столицы через вторую деревню и отпустите на дальней: отряды выйдут из обеих. Затем продолжите игру.',

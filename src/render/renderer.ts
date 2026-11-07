@@ -1,4 +1,5 @@
 import type { Drag } from '../input/pointer'
+import { squadSize } from '../sim/squads'
 import { ARROW_SECONDS } from '../sim/towers'
 import { type Cell, HUMAN, type Squad, type World } from '../sim/world'
 import { drawDecor, drawEstates, drawGround, drawTable, drawTerritory, drawTowerZones, hexPath, tileCenter } from './board'
@@ -121,6 +122,7 @@ export class Renderer {
       const { x, y } = tileCenter(this.layout, village.cell)
       drawBadge(ctx, x, y + size * 0.55, String(Math.floor(village.population)), size, ownerTone(village.owner))
     }
+    if (view.drag) this.drawLeaving(view.drag)
   }
 
   private drawLayers(): void {
@@ -211,6 +213,17 @@ export class Renderer {
       hexPath(ctx, tileCenter(this.layout, drag.target), size * 0.86)
       ctx.lineWidth = size * 0.07
       ctx.stroke()
+    }
+  }
+
+  // While dragging: above each gathered village, how many of its people would leave
+  private drawLeaving(drag: Drag): void {
+    const size = this.layout.size
+    for (const village of drag.villages) {
+      if (village.cell === drag.target) continue
+      const { x, y } = tileCenter(this.layout, village.cell)
+      const count = squadSize(village.population, drag.share)
+      drawBadge(this.ctx, x, y - size * 0.95, `−${count}`, size * 0.8, ownerTone(HUMAN))
     }
   }
 }

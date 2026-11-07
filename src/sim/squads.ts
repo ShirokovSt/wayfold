@@ -6,10 +6,18 @@ import { canTake } from './towers'
 import { ensureCapital, hasForge } from './villages'
 import type { Cell, PlayerId, Squad, Village, World } from './world'
 
-// The one way to give orders, for the player and the AI alike: all the village's people set off
-export function sendSquad(world: World, player: PlayerId, from: Village, to: Cell): Squad | null {
+// How many of the village's people set off: all of them, or half so the village is not left empty
+export type Share = 'half' | 'all'
+
+export function squadSize(population: number, share: Share): number {
+  const people = Math.floor(population)
+  return share === 'all' || people <= 1 ? people : Math.floor(people / 2)
+}
+
+// The one way to give orders, for the player and the AI alike
+export function sendSquad(world: World, player: PlayerId, from: Village, to: Cell, share: Share = 'all'): Squad | null {
   if (from.owner !== player) return null
-  const count = Math.floor(from.population)
+  const count = squadSize(from.population, share)
   const path = findPath(world.map, from.cell, to)
   if (count < 1 || !path || path.length < 2) return null
 
