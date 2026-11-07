@@ -1,3 +1,4 @@
+import type { Difficulty } from '../ai/rival'
 import type { BuildingKind, MapSize, MapType } from '../sim/world'
 
 export const en = {
@@ -23,6 +24,8 @@ export const en = {
   } satisfies Record<MapType | 'random', string>,
   mapSize: 'Size',
   mapSizes: { small: 'Small', medium: 'Medium', large: 'Large' } satisfies Record<MapSize, string>,
+  difficulty: 'Rival',
+  difficulties: { easy: 'Easy', normal: 'Normal', hard: 'Hard' } satisfies Record<Difficulty, string>,
   zoomIn: 'Zoom in (+)',
   zoomOut: 'Zoom out (−)',
   wholeMap: 'Whole map (0)',
@@ -82,6 +85,8 @@ export const ru: Strings = {
   mapTypes: { random: 'Случайная', continent: 'Материк', lakes: 'Озёра', peninsulas: 'Полуострова', islands: 'Острова' },
   mapSize: 'Размер',
   mapSizes: { small: 'Малая', medium: 'Средняя', large: 'Большая' },
+  difficulty: 'Соперник',
+  difficulties: { easy: 'Лёгкий', normal: 'Обычный', hard: 'Сильный' },
   zoomIn: 'Приблизить (+)',
   zoomOut: 'Отдалить (−)',
   wholeMap: 'Вся карта (0)',

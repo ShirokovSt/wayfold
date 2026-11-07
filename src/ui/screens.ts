@@ -1,14 +1,15 @@
 import { onLanguageChange, t } from '../i18n'
-import type { MapSettings } from '../sim/mapgen'
+import { DIFFICULTIES } from '../ai/rival'
+import type { MatchSettings } from '../game'
 import { MAP_SIZES, MAP_TYPES } from '../sim/world'
 import { button, element } from './dom'
 import { formatTime } from './hud'
 import { languageSelect } from './languageSelect'
 
-// The map settings as the new map card shows and changes them
-export interface MapChoice {
-  current(): MapSettings
-  change(settings: MapSettings): void
+// The settings as the new map card shows and changes them
+export interface MatchChoice {
+  current(): MatchSettings
+  change(settings: MatchSettings): void
 }
 
 // Cards over the board: the menu, the new map card and the end of the match
@@ -41,13 +42,13 @@ export class Screens {
     })
   }
 
-  newMap(map: MapChoice, onPlay: () => void, onBack: () => void): void {
+  newMap(choice: MatchChoice, onPlay: () => void, onBack: () => void): void {
     this.show(onBack, () =>
       element(
         'div',
         'card',
         element('h2', '', t().newMap),
-        ...this.mapChoices(map),
+        ...this.choices(choice),
         element('div', 'actions', button(t().play, onPlay, 'primary'), button(t().back, onBack)),
       ),
     )
@@ -84,11 +85,11 @@ export class Screens {
     this.refresh()
   }
 
-  // Map type and size rows; a click changes the setting and redraws the card
-  private mapChoices(map: MapChoice): HTMLElement[] {
-    const settings = map.current()
-    const choose = (next: MapSettings) => {
-      map.change(next)
+  // Map type, size and difficulty rows; a click changes the setting and redraws the card
+  private choices(choice: MatchChoice): HTMLElement[] {
+    const settings = choice.current()
+    const choose = (next: MatchSettings) => {
+      choice.change(next)
       this.refresh()
     }
     return [
@@ -96,6 +97,8 @@ export class Screens {
         [t().mapTypes[type], settings.type === type, () => choose({ ...settings, type })])),
       choiceRow(t().mapSize, MAP_SIZES.map((size) =>
         [t().mapSizes[size], settings.size === size, () => choose({ ...settings, size })])),
+      choiceRow(t().difficulty, DIFFICULTIES.map((difficulty) =>
+        [t().difficulties[difficulty], settings.difficulty === difficulty, () => choose({ ...settings, difficulty })])),
     ]
   }
 

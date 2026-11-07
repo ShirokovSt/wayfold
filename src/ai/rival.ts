@@ -9,26 +9,46 @@ import { isGuarded } from '../sim/towers'
 import { growthRate, hasForge } from '../sim/villages'
 import { type BuildingKind, type Cell, type PlayerId, type Village, type World, opponent } from '../sim/world'
 
-// How the rival plays: how soon and how often it moves, and how cautiously
-const FIRST_MOVE_SECONDS = 10
-const THINK_SECONDS = 3.5
-const SAFETY_MARGIN = 4 // extra people sent on top of what the target should have on arrival
-const MAX_GROUP = 3 // villages that may attack one target together
+export type Difficulty = 'easy' | 'normal' | 'hard'
+export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard']
+
+// How the rival plays at each difficulty: how soon and how often it moves, and how cautiously
+interface Profile {
+  firstMove: number // seconds before its first move
+  think: number // seconds between moves, give or take a fifth
+  margin: number // extra people sent on top of what the target should have on arrival
+  maxGroup: number // villages that may attack one target together
+  defendChance: number // how likely it notices that a village of its own is under attack
+  builds: BuildingKind[]
+}
+
+const PROFILES: Record<Difficulty, Profile> = {
+  easy: { firstMove: 20, think: 6, margin: 6, maxGroup: 1, defendChance: 0.5, builds: ['farm'] },
+  normal: { firstMove: 10, think: 3.5, margin: 4, maxGroup: 3, defendChance: 1, builds: ['farm', 'forge', 'tower'] },
+  hard: { firstMove: 6, think: 2, margin: 4, maxGroup: 4, defendChance: 1, builds: ['farm', 'forge', 'tower'] },
+}
 
 // A simple opponent: every few seconds it makes one move — defend, capture or raid — and spends its gold
 export class Rival {
-  private timer = FIRST_MOVE_SECONDS
+  private readonly profile: Profile
+  private timer: number
 
   constructor(
     private readonly player: PlayerId,
     private readonly random: Random,
-  ) {}
+    difficulty: Difficulty = 'normal',
+  ) {
+    this.profile = PROFILES[difficulty]
+    this.timer = this.profile.firstMove
+  }
 
   update(world: World, dt: number): void {
     this.timer -= dt
     if (this.timer > 0) return
-    this.timer = THINK_SECONDS * (0.8 + this.random() * 0.4)
-    this.defend(world) || this.capture(world) || this.raid(world)
+    this.timer = this.profile.think * (0.8 + this.random() * 0.4)
+    const noticesAttack = this.profile.defendChance >= 1 || this.random() < this.profile.defendChance
+    const defended = noticesAttack && this.defend(world)
+    if (!defended && !this.capture(world)) this.raid(world)
     this.develop(world)
   }
 
@@ -46,7 +66,7 @@ export class Rival {
     for (const village of villages) if (farms(village) === 0) plans.push([village, 'farm'])
     for (const village of villages) if (farms(village) === 1) plans.push([village, 'farm'])
 
-    for (const [village, kind] of plans) {
+    for (const [village, kind] of plans.filter(([, kind]) => this.profile.builds.includes(kind))) {
       const spot = this.buildSpot(world, village, kind)
       if (!spot) continue
       if (world.gold[this.player] >= BUILDING_COST[kind]) build(world, this.player, spot, kind)
@@ -84,14 +104,14 @@ export class Rival {
         incoming(world, village, (owner) => owner === this.player)
       if (shortfall <= 0) continue
       const helper = this.villages(world)
-        .filter((other) => other !== village && other.population > shortfall + SAFETY_MARGIN)
+        .filter((other) => other !== village && other.population > shortfall + this.profile.margin)
         .sort((a, b) => hexDistance(a.cell.hex, village.cell.hex) - hexDistance(b.cell.hex, village.cell.hex))[0]
       if (helper && sendSquad(world, this.player, helper, village.cell)) return true
     }
     return false
   }
 
-  // Picks the cheapest and closest village it can surely take, sending from up to MAX_GROUP of
+  // Picks the cheapest and closest village it can surely take, sending from up to maxGroup of
   // its nearest villages together; guarded villages only with soldiers
   private capture(world: World): boolean {
     let best: { group: Village[]; to: Village; score: number } | null = null
@@ -104,12 +124,12 @@ export class Rival {
         .filter((s) => s.path !== null)
         .map(({ from, path }) => ({ from, time: pathDuration(path!), strength: this.strength(world, from) }))
         .sort((a, b) => a.time - b.time)
-        .slice(0, MAX_GROUP)
+        .slice(0, this.profile.maxGroup)
 
       let strength = 0
       for (const [i, sender] of senders.entries()) {
         strength += sender.strength
-        const needed = to.population + growthRate(world, to) * sender.time + SAFETY_MARGIN -
+        const needed = to.population + growthRate(world, to) * sender.time + this.profile.margin -
           incoming(world, to, (owner) => owner === this.player)
         const score = sender.time + needed * 0.3 + i * 3 // a lone attack is simpler, so it is preferred
         if (strength >= needed && (!best || score < best.score)) {

@@ -3,7 +3,7 @@ import { createRandom } from '../core/rng'
 import { createWorld } from '../sim/mapgen'
 import { TICK_SECONDS } from '../sim/rules'
 import { tick } from '../sim/tick'
-import { HUMAN, MAP_TYPES, RIVAL } from '../sim/world'
+import { HUMAN, MAP_TYPES, PLAYERS, RIVAL } from '../sim/world'
 import { Rival } from './rival'
 
 describe('rival AI', () => {
@@ -32,5 +32,15 @@ describe('rival AI', () => {
     }
     // Not an assertion on balance, just that the rules keep working for a full match
     expect(world.time).toBeGreaterThan(10)
+  }, 30_000)
+
+  it.each(PLAYERS)('a hard rival beats an easy one (hard plays %i)', (hard) => {
+    const world = createWorld(2, { size: 'medium', type: 'continent' })
+    const players = PLAYERS.map((player) => new Rival(player, createRandom(player + 5), player === hard ? 'hard' : 'easy'))
+    while (world.winner === null && world.time < 20 * 60) {
+      for (const player of players) player.update(world, TICK_SECONDS)
+      tick(world, TICK_SECONDS)
+    }
+    expect(world.winner).toBe(hard)
   }, 30_000)
 })
