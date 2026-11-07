@@ -1,4 +1,4 @@
-import type { BuildingKind } from '../sim/world'
+import type { BuildingKind, MapSize, MapType } from '../sim/world'
 
 export const en = {
   title: 'Wayfold',
@@ -12,10 +12,20 @@ export const en = {
     'Each village works the land closest to it: its estate. Hover a village to see it.',
     'A watchtower guards everything within the dotted line: only soldiers from a forge can take that land, its villages and the tower.',
     'The crown marks a capital. When it falls, the largest remaining village takes its place.',
+    'Zoom with the mouse wheel, a touchpad pinch or the + and − buttons; drag empty ground to move the map.',
     'Take every enemy village to win.',
   ],
   play: 'Play',
   language: 'Language',
+  mapType: 'Map',
+  mapTypes: {
+    random: 'Random', continent: 'Mainland', lakes: 'Lakes', peninsulas: 'Peninsulas', islands: 'Islands',
+  } satisfies Record<MapType | 'random', string>,
+  mapSize: 'Size',
+  mapSizes: { small: 'Small', medium: 'Medium', large: 'Large' } satisfies Record<MapSize, string>,
+  zoomIn: 'Zoom in (+)',
+  zoomOut: 'Zoom out (−)',
+  wholeMap: 'Whole map (0)',
 
   you: 'You',
   rival: 'Rival',
@@ -35,6 +45,7 @@ export const en = {
   pause: 'Pause',
   resume: 'Resume',
   newMap: 'New map',
+  cancel: 'Cancel',
   pausedHint: 'Paused: you can still give orders. Space to resume.',
   speed: 'Game speed',
   hint: 'Drag from a village or squad to a target, sweeping over more to send them together. Click your field to build. Space: pause.',
@@ -61,10 +72,18 @@ export const ru: Strings = {
     'Каждая деревня обрабатывает ближайшую к ней землю — свои угодья. Наведите на деревню, чтобы их увидеть.',
     'Башня охраняет всё внутри точечного контура: эту землю, деревни и саму башню могут взять только солдаты из кузницы.',
     'Корона отмечает столицу. Если она пала, столицей становится самая большая из оставшихся деревень.',
+    'Масштаб — колесо мыши, щипок на тачпаде или кнопки + и −; чтобы сдвинуть карту, тяните за пустое место.',
     'Захватите все вражеские деревни, чтобы победить.',
   ],
   play: 'Играть',
   language: 'Язык',
+  mapType: 'Карта',
+  mapTypes: { random: 'Случайная', continent: 'Материк', lakes: 'Озёра', peninsulas: 'Полуострова', islands: 'Острова' },
+  mapSize: 'Размер',
+  mapSizes: { small: 'Малая', medium: 'Средняя', large: 'Большая' },
+  zoomIn: 'Приблизить (+)',
+  zoomOut: 'Отдалить (−)',
+  wholeMap: 'Вся карта (0)',
 
   you: 'Вы',
   rival: 'Соперник',
@@ -84,6 +103,7 @@ export const ru: Strings = {
   pause: 'Пауза',
   resume: 'Продолжить',
   newMap: 'Новая карта',
+  cancel: 'Отмена',
   pausedHint: 'Пауза: приказы можно отдавать. Пробел — продолжить.',
   speed: 'Скорость игры',
   hint: 'Тяните от деревни или отряда к цели, захватывая по пути другие, чтобы отправить их вместе. Нажмите на своё поле, чтобы строить. Пробел — пауза.',

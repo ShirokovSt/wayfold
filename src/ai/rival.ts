@@ -13,6 +13,7 @@ import { type BuildingKind, type Cell, type PlayerId, type Village, type World, 
 const FIRST_MOVE_SECONDS = 10
 const THINK_SECONDS = 3.5
 const SAFETY_MARGIN = 4 // extra people sent on top of what the target should have on arrival
+const MAX_GROUP = 3 // villages that may attack one target together
 
 // A simple opponent: every few seconds it makes one move — defend, capture or raid — and spends its gold
 export class Rival {
@@ -90,24 +91,41 @@ export class Rival {
     return false
   }
 
-  // Picks the cheapest and closest village it can surely take; guarded ones only with soldiers
+  // Picks the cheapest and closest village it can surely take, sending from up to MAX_GROUP of
+  // its nearest villages together; guarded villages only with soldiers
   private capture(world: World): boolean {
-    let best: { from: Village; to: Village; score: number } | null = null
-    for (const from of this.villages(world)) {
-      const soldiers = hasForge(world, from)
-      for (const to of world.villages) {
-        if (to.owner === this.player || (!soldiers && isGuarded(world, to.cell, this.player))) continue
-        const path = findPath(world.map, from.cell, to.cell)
-        if (!path) continue
-        const time = pathDuration(path)
-        const needed = to.population + growthRate(world, to) * time + SAFETY_MARGIN -
+    let best: { group: Village[]; to: Village; score: number } | null = null
+    for (const to of world.villages) {
+      if (to.owner === this.player) continue
+      const guarded = isGuarded(world, to.cell, this.player)
+      const senders = this.villages(world)
+        .filter((from) => !guarded || hasForge(world, from))
+        .map((from) => ({ from, path: findPath(world.map, from.cell, to.cell) }))
+        .filter((s) => s.path !== null)
+        .map(({ from, path }) => ({ from, time: pathDuration(path!), strength: this.strength(world, from) }))
+        .sort((a, b) => a.time - b.time)
+        .slice(0, MAX_GROUP)
+
+      let strength = 0
+      for (const [i, sender] of senders.entries()) {
+        strength += sender.strength
+        const needed = to.population + growthRate(world, to) * sender.time + SAFETY_MARGIN -
           incoming(world, to, (owner) => owner === this.player)
-        const strength = from.population * (soldiers ? SOLDIER_STRENGTH : 1)
-        const score = time + needed * 0.3
-        if (strength >= needed && (!best || score < best.score)) best = { from, to, score }
+        const score = sender.time + needed * 0.3 + i * 3 // a lone attack is simpler, so it is preferred
+        if (strength >= needed && (!best || score < best.score)) {
+          best = { group: senders.slice(0, i + 1).map((s) => s.from), to, score }
+          break
+        }
       }
     }
-    return best !== null && sendSquad(world, this.player, best.from, best.to.cell) !== null
+    if (!best) return false
+    for (const from of best.group) sendSquad(world, this.player, from, best.to.cell)
+    return true
+  }
+
+  // What the village's people are worth in a fight if they all set off now
+  private strength(world: World, village: Village): number {
+    return Math.floor(village.population) * (hasForge(world, village) ? SOLDIER_STRENGTH : 1)
   }
 
   // A full village with nothing to take marches over the nearest enemy land and back:

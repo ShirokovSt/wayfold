@@ -1,64 +1,105 @@
-import { type Hex, addHex, hexDistance, hexToPoint } from '../core/hex'
+import { type Hex, addHex, hexDistance, hexLine, hexToPoint } from '../core/hex'
+import { createNoise } from '../core/noise'
 import { type Random, createRandom, pick, randomInt } from '../core/rng'
 import { GameMap } from './map'
 import { findPath } from './pathfind'
 import {
-  MAP_HEIGHT,
-  MAP_WIDTH,
+  LAND_PER_VILLAGE,
+  MAP_DIMENSIONS,
   NEUTRAL_GARRISON,
-  NEUTRAL_PAIRS,
   START_LAND_RADIUS,
   START_POPULATION,
+  VILLAGE_PAIRS,
   isPassable,
 } from './rules'
 import { claimAround } from './territory'
-import { type Cell, HUMAN, type Owner, RIVAL, type Terrain, type Village, type World, newWorld } from './world'
+import {
+  type Cell,
+  HUMAN,
+  MAP_TYPES,
+  type MapSize,
+  type MapType,
+  type Owner,
+  RIVAL,
+  type Village,
+  type World,
+  newWorld,
+} from './world'
+
+export interface MapSettings {
+  size: MapSize
+  type: MapType | 'random'
+}
+
+export const DEFAULT_SETTINGS: MapSettings = { size: 'medium', type: 'random' }
+
+// Each map type is a share of land and a "bias" that raises or lowers the land by position:
+// u and v go from -1 to 1 across the map, the players start near u = -0.7 and u = 0.7
+// Heights are 2 × noise + bias, so a bias of about 1 decides the shape and less only nudges it
+const SHAPES: Record<MapType, { land: number; detail: number; bias: (u: number, v: number) => number }> = {
+  continent: { land: 0.86, detail: 0.12, bias: (u, v) => -1.2 * edge(u, v) },
+  lakes: { land: 0.78, detail: 0.2, bias: (u, v) => -0.3 * edge(u, v) },
+  peninsulas: { land: 0.56, detail: 0.14, bias: (u, v) => 1.4 * Math.abs(u) - 1.1 * v * v - edge(0, v) },
+  islands: { land: 0.45, detail: 0.3, bias: (u, v) => -0.5 * edge(u, v) },
+}
 
 const UP_LEFT: Hex = { q: 0, r: -1 }
 const UP_RIGHT: Hex = { q: 1, r: -1 }
 const MIN_VILLAGE_GAP = 3
+const MIN_CAPITAL_GAP = 6
+const SMALLEST_ISLAND = 4 // smaller bits of land sink back into the sea
 
 // Some random maps are unplayable (a village walled in by mountains), so we try the next seed
-export function createWorld(seed: number): World {
+export function createWorld(seed: number, settings: MapSettings = DEFAULT_SETTINGS): World {
+  const type = settings.type === 'random' ? pick(createRandom(seed), MAP_TYPES) : settings.type
   for (let attempt = 0; attempt < 100; attempt++) {
-    const world = tryCreateWorld(seed + attempt * 7919)
+    const world = tryCreateWorld(seed + attempt * 7919, settings.size, type)
     if (world) return world
   }
   throw new Error(`No playable map near seed ${seed}`)
 }
 
-function tryCreateWorld(seed: number): World | null {
+function tryCreateWorld(seed: number, size: MapSize, type: MapType): World | null {
   const random = createRandom(seed)
-  const map = new GameMap(MAP_WIDTH, MAP_HEIGHT)
-  scatter(map, random, 'forest', 7, 2, 0.65)
-  scatter(map, random, 'mountain', 4, 1, 0.5)
-  carveRiver(map, random)
+  const { width, height } = MAP_DIMENSIONS[size]
+  const map = new GameMap(width, height)
+  raiseLand(map, random, SHAPES[type])
+  if (type === 'continent') carveRiver(map, random)
 
   // The second half of the map is the first half turned by 180°: the same land for both players
-  for (const cell of map.cells.slice(0, map.cells.length / 2)) {
-    map.mirror(cell).terrain = cell.terrain
-  }
+  for (const cell of map.cells.slice(0, map.cells.length / 2)) map.mirror(cell).terrain = cell.terrain
+  connectLand(map)
 
   const villages = placeVillages(map, random)
   if (!villages || !allReachable(map, villages)) return null
-  return newWorld(map, villages)
+  return newWorld(map, villages, type)
 }
 
-// Patches of terrain around random centers
-function scatter(map: GameMap, random: Random, terrain: Terrain, patches: number, maxRadius: number, density: number): void {
-  for (let i = 0; i < patches; i++) {
-    const center = pick(random, map.cells)
-    for (const cell of map.within(center, randomInt(random, 1, maxRadius))) {
-      if (random() < density) cell.terrain = terrain
-    }
-  }
+// Heights from noise plus the map type's bias; the lowest part becomes sea, the highest mountains
+function raiseLand(map: GameMap, random: Random, shape: (typeof SHAPES)[MapType]): void {
+  const heightNoise = createNoise(random)
+  const forestNoise = createNoise(random)
+  const center = mapCenter(map)
+  const heights = map.cells.map((cell) => {
+    const { x, y } = hexToPoint(cell.hex, 1)
+    return 2 * heightNoise(x * shape.detail, y * shape.detail) + shape.bias(x / center.x - 1, y / center.y - 1)
+  })
+  const seaLevel = quantile(heights, 1 - shape.land)
+  const mountainLevel = quantile(heights.filter((h) => h >= seaLevel), 0.93)
+
+  map.cells.forEach((cell, i) => {
+    const { x, y } = hexToPoint(cell.hex, 1)
+    if (heights[i] < seaLevel) cell.terrain = 'water'
+    else if (heights[i] >= mountainLevel) cell.terrain = 'mountain'
+    else cell.terrain = forestNoise(x * 0.25 + 40, y * 0.25) > 0.58 ? 'forest' : 'field'
+  })
 }
 
-// From the map center up to the top edge, wandering left and right; crossable only at fords
+// On the mainland, a river from the map center up to the top edge, crossable only at fords
 function carveRiver(map: GameMap, random: Random): void {
   const middleRow = (map.height - 1) / 2
   const start = map.cellAtOffset(map.rowLength(middleRow) / 2 - 1, middleRow)!
-  const centerX = (hexToPoint(map.cells[0].hex, 1).x + hexToPoint(map.cells.at(-1)!.hex, 1).x) / 2
+  const centerX = mapCenter(map).x
 
   const river: Cell[] = []
   let cell: Cell | undefined = start
@@ -74,20 +115,54 @@ function carveRiver(map: GameMap, random: Random): void {
   river[Math.floor(river.length / 2) + randomInt(random, 0, 1)].terrain = 'ford'
 }
 
-// Capitals face each other across the river; neutral villages come in mirrored pairs
+// Every piece of land must be reachable: tiny islands sink, bigger ones get a line of fords
+// to the largest landmass; changes are mirrored to keep the map fair
+function connectLand(map: GameMap): void {
+  const set = (cell: Cell, terrain: Cell['terrain']) => {
+    cell.terrain = terrain
+    map.mirror(cell).terrain = terrain
+  }
+  for (let round = 0; round < 50; round++) {
+    const pieces = landPieces(map).sort((a, b) => b.length - a.length)
+    if (pieces.length <= 1) return
+    const piece = pieces[pieces.length - 1]
+    if (piece.length < SMALLEST_ISLAND) {
+      for (const cell of piece) set(cell, 'water')
+      continue
+    }
+    const [from, to] = closestPair(piece, pieces[0])
+    for (const hex of hexLine(from.hex, to.hex)) {
+      const cell = map.cellAt(hex)!
+      if (cell.terrain === 'water') set(cell, 'ford')
+      else if (cell.terrain === 'mountain') set(cell, 'field')
+    }
+  }
+}
+
+// Capitals face each other from the left and the right; neutral villages come in mirrored pairs,
+// spread out as far from each other as the land allows
 function placeVillages(map: GameMap, random: Random): Village[] | null {
-  const middleRow = (map.height - 1) / 2
-  const capital = map.cellAtOffset(2, middleRow)!
-  const leftBank = [...reachableFrom(map, capital, (cell) => cell.terrain !== 'water' && cell.terrain !== 'ford')]
+  const center = mapCenter(map)
+  const land = map.cells.filter((cell) => cell.terrain === 'field' || cell.terrain === 'forest')
+  const pairs = Math.min(VILLAGE_PAIRS.max, Math.max(VILLAGE_PAIRS.min, Math.round(land.length / LAND_PER_VILLAGE / 2)))
+
+  const capitalScore = (cell: Cell) => {
+    const { x, y } = hexToPoint(cell.hex, 1)
+    return Math.abs(x / center.x - 1 + 0.7) + 0.5 * Math.abs(y / center.y - 1)
+  }
+  const capital = land
+    .filter((cell) => hexDistance(cell.hex, map.mirror(cell).hex) >= MIN_CAPITAL_GAP)
+    .sort((a, b) => capitalScore(a) - capitalScore(b))[0]
+  if (!capital) return null
 
   const spots = [capital]
-  for (let tries = 0; tries < 300 && spots.length < 1 + NEUTRAL_PAIRS; tries++) {
-    const spot = pick(random, leftBank)
-    const others = [...spots, ...spots.map((s) => map.mirror(s)), map.mirror(spot)]
-    const farEnough = others.every((other) => hexDistance(spot.hex, other.hex) >= MIN_VILLAGE_GAP)
-    if (spot.terrain !== 'mountain' && farEnough) spots.push(spot)
+  const taken = () => [...spots, ...spots.map((s) => map.mirror(s))]
+  const gap = (cell: Cell) => Math.min(...[...taken(), map.mirror(cell)].map((other) => hexDistance(cell.hex, other.hex)))
+  while (spots.length < pairs) {
+    const candidates = Array.from({ length: 30 }, () => pick(random, land)).filter((cell) => gap(cell) >= MIN_VILLAGE_GAP)
+    if (candidates.length === 0) return null
+    spots.push(candidates.sort((a, b) => gap(b) - gap(a))[0])
   }
-  if (spots.length < 1 + NEUTRAL_PAIRS) return null
 
   const villages: Village[] = []
   const addVillage = (cell: Cell, owner: Owner, population: number) => {
@@ -96,7 +171,6 @@ function placeVillages(map: GameMap, random: Random): Village[] | null {
     cell.village = village
     cell.owner = owner
     villages.push(village)
-    return village
   }
   for (const [i, spot] of spots.entries()) {
     const population = i === 0 ? START_POPULATION : randomInt(random, NEUTRAL_GARRISON.min, NEUTRAL_GARRISON.max)
@@ -107,23 +181,61 @@ function placeVillages(map: GameMap, random: Random): Village[] | null {
   return villages
 }
 
+// Villages block paths, so check each one can actually be marched to from the capital
 function allReachable(map: GameMap, villages: Village[]): boolean {
-  const reached = reachableFrom(map, villages[0].cell, isPassable)
-  if (!villages.every((village) => reached.has(village.cell))) return false
-  // Villages block paths, so also check each one can actually be marched to from the capital
   return villages.slice(1).every((village) => findPath(map, villages[0].cell, village.cell) !== null)
 }
 
-function reachableFrom(map: GameMap, start: Cell, canEnter: (cell: Cell) => boolean): Set<Cell> {
-  const reached = new Set([start])
-  const queue = [start]
-  while (queue.length > 0) {
-    for (const next of map.neighbors(queue.shift()!)) {
-      if (!reached.has(next) && canEnter(next)) {
-        reached.add(next)
-        queue.push(next)
+// Groups of walkable tiles that touch each other
+function landPieces(map: GameMap): Cell[][] {
+  const seen = new Set<Cell>()
+  const pieces: Cell[][] = []
+  for (const start of map.cells) {
+    if (seen.has(start) || !isPassable(start)) continue
+    const piece = [start]
+    seen.add(start)
+    for (let i = 0; i < piece.length; i++) {
+      for (const next of map.neighbors(piece[i])) {
+        if (!seen.has(next) && isPassable(next)) {
+          seen.add(next)
+          piece.push(next)
+        }
+      }
+    }
+    pieces.push(piece)
+  }
+  return pieces
+}
+
+function closestPair(a: Cell[], b: Cell[]): [Cell, Cell] {
+  let best: [Cell, Cell] = [a[0], b[0]]
+  let bestDistance = Infinity
+  for (const x of a) {
+    for (const y of b) {
+      const distance = hexDistance(x.hex, y.hex)
+      if (distance < bestDistance) {
+        best = [x, y]
+        bestDistance = distance
       }
     }
   }
-  return reached
+  return best
+}
+
+// The middle of the map in hex radii; the first cell is at (0, 0)
+function mapCenter(map: GameMap): { x: number; y: number } {
+  const last = hexToPoint(map.cells[map.cells.length - 1].hex, 1)
+  return { x: last.x / 2, y: last.y / 2 }
+}
+
+// How strongly the map edge pulls the land down: 0 inside, 1 at the very edge
+function edge(u: number, v: number): number {
+  const t = Math.min(1, Math.max(0, (Math.max(Math.abs(u), Math.abs(v)) - 0.65) / 0.35))
+  return t * t * (3 - 2 * t)
+}
+
+// The value below which the given share of the values lies
+function quantile(values: number[], share: number): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(share * sorted.length)))]
 }

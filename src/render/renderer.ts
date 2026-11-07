@@ -28,9 +28,11 @@ export interface View {
 export class Renderer {
   readonly layout = new Layout()
   private readonly ctx: CanvasRenderingContext2D
-  // The board itself never changes during a match, so it is drawn once into these layers
+  // The board itself never changes during a match, so it is drawn into these layers
+  // and redrawn only when the camera moves
   private readonly ground = document.createElement('canvas')
   private readonly decor = document.createElement('canvas')
+  private layersStale = true
   private width = 0
   private height = 0
 
@@ -42,9 +44,16 @@ export class Renderer {
     this.resize()
   }
 
+  // A new map can have another size: the camera starts over with the whole map in view
   setWorld(world: World): void {
     this.world = world
-    this.drawLayers()
+    this.layout.resetCamera()
+    this.layout.fit(world.map, this.width, this.height)
+    this.layersStale = true
+  }
+
+  cameraMoved(): void {
+    this.layersStale = true
   }
 
   resize(): void {
@@ -56,14 +65,16 @@ export class Renderer {
       canvas.height = Math.round(this.height * dpr)
     }
     this.layout.fit(this.world.map, this.width, this.height)
-    this.drawLayers()
+    this.layersStale = true
   }
 
   // `alpha` is how far we are between the last tick and the next one, for smooth movement
   draw(alpha: number, time: number, view: View): void {
+    if (this.width === 0 || this.height === 0) return // a hidden page has no room to draw in
     const ctx = this.ctx
     const dpr = this.canvas.width / this.width
     const size = this.layout.size
+    if (this.layersStale) this.drawLayers()
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.drawImage(this.ground, 0, 0, this.width, this.height)
     drawTerritory(ctx, this.world.map, this.layout)
@@ -105,6 +116,7 @@ export class Renderer {
   }
 
   private drawLayers(): void {
+    this.layersStale = false
     const dpr = this.canvas.width / this.width
     const ground = this.ground.getContext('2d')!
     const decor = this.decor.getContext('2d')!

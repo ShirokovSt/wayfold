@@ -1,3 +1,4 @@
+import type { Point } from '../core/hex'
 import type { Game } from '../game'
 import type { Layout } from '../render/layout'
 import { findPath } from '../sim/pathfind'
@@ -5,6 +6,7 @@ import { redirectSquad, sendSquad, squadCell } from '../sim/squads'
 import { type Cell, HUMAN, type Squad, type Village } from '../sim/world'
 
 const SQUAD_GRAB_RADIUS = 0.6 // how close to a squad (in hex radii) a press picks it up
+const DRAG_THRESHOLD = 5 // pixels the pointer must move before a press on empty ground becomes panning
 
 // One gesture: the villages and squads gathered so far, and where they would go
 export interface Drag {
@@ -15,13 +17,18 @@ export interface Drag {
 }
 
 // Press on your village or squad, sweep over more of them, release on the target: they all set off.
-// A plain click on any other tile is passed on, e.g. to open the build menu
+// Dragging empty ground moves the map, two fingers on a touch screen zoom it,
+// and a plain click on any other tile is passed on, e.g. to open the build menu
 export class PointerInput {
   drag: Drag | null = null
   hover: Cell | null = null
   onPress: () => void = () => {}
   onTileClick: (cell: Cell) => void = () => {}
+  onCameraMove: () => void = () => {}
   private pressed: Cell | null = null // a tile pressed outside of a drag
+  private pan: { x: number; y: number; moved: boolean } | null = null
+  private touches = new Map<number, Point>()
+  private pinchDistance = 0
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -31,7 +38,11 @@ export class PointerInput {
     canvas.addEventListener('pointerdown', (event) => this.press(event))
     canvas.addEventListener('pointermove', (event) => this.move(event))
     canvas.addEventListener('pointerup', (event) => this.release(event))
-    canvas.addEventListener('pointercancel', () => (this.drag = null))
+    canvas.addEventListener('pointercancel', (event) => {
+      this.touches.delete(event.pointerId)
+      this.drag = null
+      this.pan = null
+    })
     canvas.addEventListener('pointerleave', () => (this.hover = null))
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') this.drag = null
@@ -40,18 +51,38 @@ export class PointerInput {
 
   private press(event: PointerEvent): void {
     this.onPress()
-    // Orders work during the pause too: plan calmly, then let it run
-    if (this.game.world.winner !== null) return
-    this.drag = { villages: [], squads: [], target: null, paths: [] }
-    if (!this.gather(event)) {
-      this.drag = null
-      this.pressed = this.cellAt(event) ?? null
+    this.canvas.setPointerCapture(event.pointerId)
+    if (event.pointerType === 'touch') this.touches.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    if (this.touches.size === 2) {
+      this.startPinch()
       return
     }
-    this.canvas.setPointerCapture(event.pointerId)
+    this.drag = { villages: [], squads: [], target: null, paths: [] }
+    // Orders work during the pause too: plan calmly, then let it run
+    if (this.game.world.winner !== null || !this.gather(event)) {
+      this.drag = null
+      this.pressed = this.cellAt(event) ?? null
+      this.pan = { x: event.clientX, y: event.clientY, moved: false }
+    }
   }
 
   private move(event: PointerEvent): void {
+    if (this.touches.has(event.pointerId)) {
+      this.touches.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (this.touches.size === 2) {
+        this.pinch()
+        return
+      }
+    }
+    if (this.pan) {
+      const dx = event.clientX - this.pan.x
+      const dy = event.clientY - this.pan.y
+      if (this.pan.moved || Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+        this.pan = { x: event.clientX, y: event.clientY, moved: true }
+        this.layout.panBy(dx, dy)
+        this.onCameraMove()
+      }
+    }
     const cell = this.cellAt(event) ?? null
     this.hover = cell
     const drag = this.drag
@@ -65,12 +96,15 @@ export class PointerInput {
   }
 
   private release(event: PointerEvent): void {
+    this.touches.delete(event.pointerId)
     const drag = this.drag
     const pressed = this.pressed
+    const panned = this.pan?.moved ?? false
     this.drag = null
     this.pressed = null
+    this.pan = null
     if (!drag) {
-      if (pressed && pressed === this.cellAt(event)) this.onTileClick(pressed)
+      if (!panned && pressed && pressed === this.cellAt(event)) this.onTileClick(pressed)
       return
     }
     if (!drag.target) return
@@ -80,6 +114,24 @@ export class PointerInput {
       if (village.cell !== drag.target) sendSquad(world, HUMAN, village, drag.target)
     }
     for (const squad of drag.squads) redirectSquad(world, HUMAN, squad, drag.target)
+  }
+
+  // A second finger turns any gesture into zooming
+  private startPinch(): void {
+    this.drag = null
+    this.pan = null
+    this.pressed = null
+    const [a, b] = [...this.touches.values()]
+    this.pinchDistance = Math.hypot(a.x - b.x, a.y - b.y)
+  }
+
+  private pinch(): void {
+    const [a, b] = [...this.touches.values()]
+    const distance = Math.hypot(a.x - b.x, a.y - b.y)
+    const rect = this.canvas.getBoundingClientRect()
+    this.layout.zoomAt((a.x + b.x) / 2 - rect.left, (a.y + b.y) / 2 - rect.top, distance / this.pinchDistance)
+    this.pinchDistance = distance
+    this.onCameraMove()
   }
 
   // Adds your village or squad under the pointer to the group; true if someone joined

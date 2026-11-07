@@ -48,6 +48,18 @@ export function hexCorner(center: Point, size: number, i: number): Point {
   return { x: center.x + size * Math.cos(angle), y: center.y + size * Math.sin(angle) }
 }
 
+// The hexes on a straight line from a to b, both included
+export function hexLine(a: Hex, b: Hex): Hex[] {
+  const steps = hexDistance(a, b)
+  const line: Hex[] = []
+  for (let i = 0; i <= steps; i++) {
+    const t = steps === 0 ? 0 : i / steps
+    // A tiny nudge keeps the line from running exactly along hex edges
+    line.push(roundHex(a.q + (b.q - a.q) * t + 1e-6, a.r + (b.r - a.r) * t + 1e-6))
+  }
+  return line
+}
+
 // Rounds fractional coordinates to the hex that contains them
 function roundHex(q: number, r: number): Hex {
   const s = -q - r

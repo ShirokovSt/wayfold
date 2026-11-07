@@ -9,7 +9,13 @@ export const PLAYERS: readonly PlayerId[] = [HUMAN, RIVAL]
 // null means nobody's: wild land or a neutral village
 export type Owner = PlayerId | null
 
+// Ford: a walkable sandbar across a river or a strait between pieces of land
 export type Terrain = 'field' | 'forest' | 'mountain' | 'water' | 'ford'
+
+export type MapType = 'continent' | 'lakes' | 'peninsulas' | 'islands'
+export const MAP_TYPES: readonly MapType[] = ['continent', 'lakes', 'peninsulas', 'islands']
+export type MapSize = 'small' | 'medium' | 'large'
+export const MAP_SIZES: readonly MapSize[] = ['small', 'medium', 'large']
 
 export type BuildingKind = 'farm' | 'forge' | 'tower'
 export const BUILDING_KINDS: readonly BuildingKind[] = ['farm', 'forge', 'tower']
@@ -64,6 +70,7 @@ export interface Arrow {
 
 export interface World {
   readonly map: GameMap
+  readonly mapType: MapType
   readonly villages: Village[]
   squads: Squad[]
   gold: Record<PlayerId, number>
@@ -73,8 +80,8 @@ export interface World {
   nextId: number
 }
 
-export function newWorld(map: GameMap, villages: Village[]): World {
-  return { map, villages, squads: [], gold: { 0: 0, 1: 0 }, arrows: [], time: 0, winner: null, nextId: 0 }
+export function newWorld(map: GameMap, villages: Village[], mapType: MapType = 'continent'): World {
+  return { map, mapType, villages, squads: [], gold: { 0: 0, 1: 0 }, arrows: [], time: 0, winner: null, nextId: 0 }
 }
 
 export function opponent(player: PlayerId): PlayerId {

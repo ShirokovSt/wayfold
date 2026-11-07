@@ -1,12 +1,17 @@
-import type { BuildingKind, Cell, Terrain } from './world'
+import type { BuildingKind, Cell, MapSize, Terrain } from './world'
 
 // All the balance numbers in one place
 
 export const TICK_SECONDS = 1 / 20
 
-export const MAP_WIDTH = 17
-export const MAP_HEIGHT = 11 // odd, so the map has a middle row
-export const NEUTRAL_PAIRS = 3 // neutral villages on each side of the river
+// Map sizes in tiles; heights are odd, so every map has a middle row
+export const MAP_DIMENSIONS: Record<MapSize, { width: number; height: number }> = {
+  small: { width: 17, height: 11 },
+  medium: { width: 23, height: 15 },
+  large: { width: 29, height: 19 },
+}
+export const LAND_PER_VILLAGE = 22 // roughly one village for this many land tiles...
+export const VILLAGE_PAIRS = { min: 3, max: 7 } // ...but from 6 to 14 villages in all
 
 // How many field tiles a step onto this terrain is worth; Infinity is impassable
 export const MOVE_COST: Record<Terrain, number> = {

@@ -7,7 +7,7 @@
   --muted: #c4b49a;
   --paper: #f5ecd9;
   --ink: #3b2a1d;
-  --you: #3f7fd6;
+  --you: #8a4fc8;
   --rival: #d6493c;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 15px;
@@ -119,14 +119,14 @@ button.active {
 
 button.primary {
   background: var(--you);
-  border-color: #1f4c8c;
+  border-color: #4e2a80;
   color: white;
   font-weight: 700;
   padding: 8px 22px;
 }
 
 button.primary:hover {
-  background: #4b8ee6;
+  background: #9a63d6;
 }
 
 .language button {
@@ -271,6 +271,26 @@ button.primary:hover {
   border: 1.5px solid #8a6514;
 }
 
+/* Zoom buttons in the corner of the board */
+
+.zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.zoom button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  background: rgba(74, 54, 38, 0.9);
+}
+
 /* Cards over the board */
 
 #overlay {
@@ -286,7 +306,9 @@ button.primary:hover {
 }
 
 .card {
-  max-width: 520px;
+  max-width: 560px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   margin: 16px;
   padding: 28px 32px;
   border-radius: 14px;
@@ -338,10 +360,48 @@ button.primary:hover {
   color: #7d6a52;
 }
 
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.choice .label {
+  min-width: 64px;
+  color: #7d6a52;
+}
+
+.choice .options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.card .choice button {
+  color: var(--ink);
+  background: transparent;
+  border-color: #c9b791;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.card .choice button.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
 .actions {
+  margin-top: 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.card .actions > button:not(.primary) {
+  color: var(--ink);
+  background: transparent;
+  border-color: #c9b791;
 }
 
 .card .language button {

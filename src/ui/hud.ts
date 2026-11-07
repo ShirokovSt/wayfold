@@ -38,7 +38,7 @@ export class Hud {
       setText(people, String(countPeople(world, player)))
       setText(land, `${Math.round(landShare(world, player) * 100)}%`)
     }
-    setText(this.clock, formatTime(world.time))
+    setText(this.clock, `${t().mapTypes[world.mapType]} · ${t().mapSizes[this.game.settings.size]} · ${formatTime(world.time)}`)
     setText(this.pauseButton, this.game.paused && this.game.started ? t().resume : t().pause)
     SPEEDS.forEach((speed, i) => this.speedButtons[i].classList.toggle('active', speed === this.game.speed))
   }

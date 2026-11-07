@@ -2,6 +2,7 @@ import './ui/styles.css'
 import logoUrl from './assets/logo.svg'
 import { Game } from './game'
 import { currentLanguage, onLanguageChange, t } from './i18n'
+import { CameraControls } from './input/camera'
 import { PointerInput } from './input/pointer'
 import { Renderer } from './render/renderer'
 import { TICK_SECONDS } from './sim/rules'
@@ -9,6 +10,7 @@ import { HUMAN } from './sim/world'
 import { BuildMenu } from './ui/buildMenu'
 import { Hud } from './ui/hud'
 import { Screens } from './ui/screens'
+import { zoomButtons } from './ui/zoomButtons'
 
 const TICK_MS = TICK_SECONDS * 1000
 const MAX_FRAME_MS = 250 // after a long pause, don't try to catch up
@@ -24,13 +26,23 @@ const canvas = document.querySelector<HTMLCanvasElement>('#board')!
 const renderer = new Renderer(canvas, game.world)
 const input = new PointerInput(canvas, renderer.layout, game)
 const screens = new Screens(document.querySelector('#overlay')!)
-const hud = new Hud(document.querySelector('#hud')!, game, { togglePause, newMap, setSpeed })
-const buildMenu = new BuildMenu(document.querySelector('.stage')!, game, renderer.layout)
+const hud = new Hud(document.querySelector('#hud')!, game, { togglePause, newMap: chooseNewMap, setSpeed })
+const stage = document.querySelector<HTMLElement>('.stage')!
+const buildMenu = new BuildMenu(stage, game, renderer.layout)
+const camera = new CameraControls(canvas, renderer.layout)
 const banner = document.querySelector<HTMLElement>('#banner')!
 let endShown = false
 
 input.onPress = () => buildMenu.close()
 input.onTileClick = (cell) => buildMenu.open(cell)
+// The build menu would stay where its tile used to be, so it closes when the map moves
+const cameraMoved = () => {
+  renderer.cameraMoved()
+  buildMenu.close()
+}
+input.onCameraMove = cameraMoved
+camera.onChange = cameraMoved
+zoomButtons(stage, camera)
 
 function play(): void {
   game.started = true
@@ -41,7 +53,7 @@ function play(): void {
 
 // The pause leaves the board open: you can still give orders, they start when the game resumes
 function togglePause(): void {
-  if (game.world.winner !== null) return
+  if (game.world.winner !== null || screens.choosingMap) return
   if (game.paused) {
     play()
   } else {
@@ -52,6 +64,27 @@ function togglePause(): void {
 
 function setSpeed(speed: number): void {
   game.speed = speed
+}
+
+// The game waits behind the card; Cancel goes back to it as it was
+function chooseNewMap(): void {
+  if (screens.choosingMap) return
+  const wasPaused = game.paused
+  const inMatch = game.world.winner === null
+  let settings = game.settings
+  game.paused = true
+  banner.hidden = true
+  const choice = { current: () => settings, change: (next: typeof settings) => (settings = next) }
+  const start = () => {
+    game.changeSettings(settings)
+    newMap()
+  }
+  const cancel = () => {
+    screens.hide()
+    game.paused = wasPaused
+    banner.hidden = !wasPaused
+  }
+  screens.newMap(choice, start, inMatch && game.started ? cancel : undefined)
 }
 
 function newMap(): void {
@@ -81,13 +114,21 @@ window.addEventListener('keydown', (event) => {
   event.preventDefault() // otherwise Space would also press the focused button
   togglePause()
 })
-screens.start(play)
+screens.start(play, {
+  current: () => game.settings,
+  change: (settings) => {
+    game.changeSettings(settings)
+    game.restart(Date.now())
+    renderer.setWorld(game.world)
+  },
+})
 
 // Fixed-step simulation: ticks run at the same rate whatever the frame rate is
 let lastTime = performance.now()
 let pending = 0
 
 function frame(now: number): void {
+  requestAnimationFrame(frame) // first, so one failed frame does not stop the game
   pending = Math.min(pending + (now - lastTime) * game.speed, MAX_FRAME_MS)
   lastTime = now
   while (pending >= TICK_MS) {
@@ -106,9 +147,8 @@ function frame(now: number): void {
   const winner = game.world.winner
   if (winner !== null && !endShown) {
     endShown = true
-    screens.end(winner === HUMAN, game.world.time, newMap)
+    screens.end(winner === HUMAN, game.world.time, chooseNewMap)
   }
-  requestAnimationFrame(frame)
 }
 
 requestAnimationFrame(frame)

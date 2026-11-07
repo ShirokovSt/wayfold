@@ -1,11 +1,11 @@
-import { DIRECTIONS, type Point, addHex, hexCorner } from '../core/hex'
+import { DIRECTIONS, type Point, addHex, hexCorner, hexDistance, hexToPoint } from '../core/hex'
 import { type Random, createRandom } from '../core/rng'
 import type { GameMap } from '../sim/map'
 import { estateTiles, estateVillage } from '../sim/estates'
 import { TOWER_RANGE } from '../sim/rules'
 import type { Cell, Village, World } from '../sim/world'
 import { type Layout, TILE_DEPTH } from './layout'
-import { LEAVES, ROCK, SHADOW, TABLE, TERRAIN, WOOD, ownerTone } from './palette'
+import { LEAVES, ROCK, SANDBAR, SHADOW, TABLE, TERRAIN, WOOD, ownerTone } from './palette'
 
 const FACE = 0.93 // top face radius in tile sizes, the rest is the gap between tiles
 const BORDER = 0.8 // where the border line runs, inside the tile
@@ -70,7 +70,7 @@ export function drawGround(ctx: CanvasRenderingContext2D, map: GameMap, layout: 
     ctx.fill()
     ctx.stroke()
 
-    drawTexture(ctx, cell, center, size, createRandom(cell.index * 9973 + 17))
+    drawTexture(ctx, cell, center, size, createRandom(cell.index * 9973 + 17), fordAngle(map, cell))
   }
 }
 
@@ -129,7 +129,9 @@ export function drawDecor(ctx: CanvasRenderingContext2D, map: GameMap, layout: L
   }
 }
 
-function drawTexture(ctx: CanvasRenderingContext2D, cell: Cell, center: Point, size: number, random: Random): void {
+function drawTexture(
+  ctx: CanvasRenderingContext2D, cell: Cell, center: Point, size: number, random: Random, fordAngle: number,
+): void {
   const at = () => ({ x: center.x + (random() - 0.5) * size * 1.1, y: center.y + (random() - 0.5) * size * 0.9 })
   ctx.lineCap = 'round'
   if (cell.terrain === 'field') {
@@ -156,9 +158,18 @@ function drawTexture(ctx: CanvasRenderingContext2D, cell: Cell, center: Point, s
       ctx.stroke()
     }
     if (cell.terrain === 'ford') {
-      // Stepping stones
-      for (let i = -1; i <= 1; i++) {
-        ellipse(ctx, center.x + i * size * 0.32, center.y + i * size * 0.1, size * 0.12, size * 0.08, ROCK.light)
+      // A sandbar across the water with pebbles on it: the way over
+      ctx.beginPath()
+      ctx.ellipse(center.x, center.y, size * 0.74, size * 0.28, fordAngle, 0, Math.PI * 2)
+      ctx.fillStyle = SANDBAR.sand
+      ctx.strokeStyle = SANDBAR.edge
+      ctx.lineWidth = size * 0.04
+      ctx.fill()
+      ctx.stroke()
+      for (let i = -2; i <= 2; i++) {
+        const x = center.x + Math.cos(fordAngle) * i * size * 0.25
+        const y = center.y + Math.sin(fordAngle) * i * size * 0.25
+        ellipse(ctx, x, y, size * 0.06, size * 0.04, SANDBAR.pebble)
       }
     }
   }
@@ -343,4 +354,19 @@ export function drawTowerZones(ctx: CanvasRenderingContext2D, world: World, layo
   }
   ctx.setLineDash([])
   ctx.lineCap = 'butt'
+}
+
+// A ford's sandbar runs between the two walkable neighbors farthest apart, from bank to bank
+function fordAngle(map: GameMap, cell: Cell): number {
+  const banks = map.neighbors(cell).filter((n) => n.terrain !== 'water')
+  let best: [Cell, Cell] | null = null
+  for (const a of banks) {
+    for (const b of banks) {
+      if (!best || hexDistance(a.hex, b.hex) > hexDistance(best[0].hex, best[1].hex)) best = [a, b]
+    }
+  }
+  if (!best || best[0] === best[1]) return -0.35
+  const from = hexToPoint(best[0].hex, 1)
+  const to = hexToPoint(best[1].hex, 1)
+  return Math.atan2(to.y - from.y, to.x - from.x)
 }
