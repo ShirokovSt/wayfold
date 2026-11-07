@@ -3,7 +3,7 @@ import { button, element } from './dom'
 import { formatTime } from './hud'
 import { languageSwitch } from './languageSwitch'
 
-// Cards over the board: the start screen, the pause and the end of the match
+// Cards over the board: the start screen and the end of the match
 export class Screens {
   private content: (() => HTMLElement) | null = null
 
@@ -22,10 +22,6 @@ export class Screens {
         element('div', 'actions', button(t().play, onPlay, 'primary'), languageSwitch()),
       ),
     )
-  }
-
-  paused(onResume: () => void): void {
-    this.show(() => element('div', 'card small', element('h2', '', t().paused), button(t().resume, onResume, 'primary')))
   }
 
   end(won: boolean, seconds: number, onPlayAgain: () => void): void {

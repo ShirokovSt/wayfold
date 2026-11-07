@@ -33,8 +33,9 @@ export class PointerInput {
   }
 
   private press(event: PointerEvent): void {
-    if (this.game.paused) return
-    this.drag = { villages: [], squads: [], target: null, paths: [] }
+    // Orders work during the pause too: plan calmly, then let it run
+    if (this.game.world.winner !== null) return
+    this.drag ={ villages: [], squads: [], target: null, paths: [] }
     if (!this.gather(event)) {
       this.drag = null
       return

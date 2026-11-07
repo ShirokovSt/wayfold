@@ -6,9 +6,12 @@ import { HUMAN, PLAYERS, type PlayerId, type World } from '../sim/world'
 import { button, element } from './dom'
 import { languageSwitch } from './languageSwitch'
 
+const SPEEDS = [0.5, 1, 2]
+
 interface Actions {
   togglePause(): void
   newMap(): void
+  setSpeed(speed: number): void
 }
 
 // The top bar: both players' numbers, the match clock and the buttons
@@ -16,6 +19,7 @@ export class Hud {
   private values: { player: PlayerId; villages: HTMLElement; people: HTMLElement; land: HTMLElement }[] = []
   private clock = element('span', 'clock')
   private pauseButton = button('', () => this.actions.togglePause())
+  private speedButtons: HTMLButtonElement[] = []
 
   constructor(
     private readonly root: HTMLElement,
@@ -34,8 +38,8 @@ export class Hud {
       setText(land, `${Math.round(landShare(world, player) * 100)}%`)
     }
     setText(this.clock, formatTime(world.time))
-    const started = world.time > 0
-    setText(this.pauseButton, this.game.paused && started ? t().resume : t().pause)
+    setText(this.pauseButton, this.game.paused && this.game.started ? t().resume : t().pause)
+    SPEEDS.forEach((speed, i) => this.speedButtons[i].classList.toggle('active', speed === this.game.speed))
   }
 
   private build(): void {
@@ -56,11 +60,14 @@ export class Hud {
         element('span', 'label', t().land), row.land,
       )
     })
+    this.speedButtons = SPEEDS.map((speed) => button(`×${speed}`, () => this.actions.setSpeed(speed)))
+    const speeds = element('div', 'speed', ...this.speedButtons)
+    speeds.title = t().speed
     this.root.replaceChildren(
       element('div', 'brand', logo, t().title),
       ...stats,
       this.clock,
-      element('div', 'group', this.pauseButton, button(t().newMap, () => this.actions.newMap()), languageSwitch()),
+      element('div', 'group', speeds, this.pauseButton, button(t().newMap, () => this.actions.newMap()), languageSwitch()),
     )
     this.update()
   }

@@ -50,14 +50,16 @@ export class Renderer {
     this.drawLayers()
   }
 
-  // `alpha` is how far we are between the last tick and the next one, for smooth movement
-  draw(alpha: number, time: number, drag: Drag | null): void {
+  // `alpha` is how far we are between the last tick and the next one, for smooth movement;
+  // on pause the routes of your squads are shown, to plan the next orders
+  draw(alpha: number, time: number, drag: Drag | null, showRoutes: boolean): void {
     const ctx = this.ctx
     const dpr = this.canvas.width / this.width
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.drawImage(this.ground, 0, 0, this.width, this.height)
     drawTerritory(ctx, this.world.map, this.layout)
     ctx.drawImage(this.decor, 0, 0, this.width, this.height)
+    if (showRoutes) this.drawRoutes()
     if (drag) this.drawDrag(drag)
 
     const size = this.layout.size
@@ -99,6 +101,29 @@ export class Renderer {
       drawPerson(this.ctx, x + spot.x * size, y + spot.y * size + size * 0.15, size, tone, time * 9 + i * 1.7 + squad.id)
     })
     if (squad.count > 1) drawBadge(this.ctx, x, y - size * 0.38, String(squad.count), size * 0.8, tone)
+  }
+
+  // Where your squads are heading: from their current spot along the rest of the path
+  private drawRoutes(): void {
+    const ctx = this.ctx
+    const size = this.layout.size
+    ctx.setLineDash([size * 0.08, size * 0.14])
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = size * 0.06
+    ctx.strokeStyle = ownerTone(HUMAN).dark
+    for (const squad of this.world.squads) {
+      if (squad.owner !== HUMAN) continue
+      const start = this.layout.toScreen(squad.x, squad.y)
+      ctx.beginPath()
+      ctx.moveTo(start.x, start.y)
+      for (const cell of squad.path.slice(squad.step + 1)) {
+        const { x, y } = tileCenter(this.layout, cell)
+        ctx.lineTo(x, y)
+      }
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
   }
 
   // While dragging: rings around the gathered villages and squads, and the routes they would take

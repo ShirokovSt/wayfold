@@ -134,6 +134,25 @@ button.primary:hover {
   font-size: 13px;
 }
 
+.speed {
+  display: flex;
+  margin-right: 6px;
+}
+
+.speed button {
+  padding: 5px 9px;
+  font-size: 13px;
+  border-radius: 0;
+}
+
+.speed button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.speed button:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
 /* Board */
 
 .stage {
@@ -159,6 +178,25 @@ button.primary:hover {
   color: var(--muted);
   font-size: 13px;
   pointer-events: none;
+}
+
+#banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 3px 0 #c9b791, 0 6px 16px rgba(0, 0, 0, 0.35);
+  pointer-events: none; /* the board under it stays clickable */
+}
+
+#banner[hidden] {
+  display: none;
 }
 
 /* Cards over the board */

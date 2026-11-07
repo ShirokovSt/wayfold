@@ -23,22 +23,30 @@ const canvas = document.querySelector<HTMLCanvasElement>('#board')!
 const renderer = new Renderer(canvas, game.world)
 const input = new PointerInput(canvas, renderer.layout, game)
 const screens = new Screens(document.querySelector('#overlay')!)
-const hud = new Hud(document.querySelector('#hud')!, game, { togglePause, newMap })
+const hud = new Hud(document.querySelector('#hud')!, game, { togglePause, newMap, setSpeed })
+const banner = document.querySelector<HTMLElement>('#banner')!
 let endShown = false
 
 function play(): void {
+  game.started = true
   game.paused = false
+  banner.hidden = true
   screens.hide()
 }
 
+// The pause leaves the board open: you can still give orders, they start when the game resumes
 function togglePause(): void {
   if (game.world.winner !== null) return
   if (game.paused) {
     play()
   } else {
     game.paused = true
-    screens.paused(play)
+    banner.hidden = false
   }
+}
+
+function setSpeed(speed: number): void {
+  game.speed = speed
 }
 
 function newMap(): void {
@@ -50,9 +58,12 @@ function newMap(): void {
 }
 
 const hint = document.querySelector('#hint')!
-const showHint = () => (hint.textContent = t().hint)
-showHint()
-onLanguageChange(showHint)
+const showTexts = () => {
+  hint.textContent = t().hint
+  banner.textContent = t().pausedHint
+}
+showTexts()
+onLanguageChange(showTexts)
 
 new ResizeObserver(() => renderer.resize()).observe(canvas)
 window.addEventListener('keydown', (event) => {
@@ -67,13 +78,13 @@ let lastTime = performance.now()
 let pending = 0
 
 function frame(now: number): void {
-  pending = Math.min(pending + now - lastTime, MAX_FRAME_MS)
+  pending = Math.min(pending + (now - lastTime) * game.speed, MAX_FRAME_MS)
   lastTime = now
   while (pending >= TICK_MS) {
     game.update(TICK_SECONDS)
     pending -= TICK_MS
   }
-  renderer.draw(game.paused ? 1 : pending / TICK_MS, now / 1000, input.drag)
+  renderer.draw(game.paused ? 1 : pending / TICK_MS, now / 1000, input.drag, game.paused)
   hud.update()
 
   const winner = game.world.winner

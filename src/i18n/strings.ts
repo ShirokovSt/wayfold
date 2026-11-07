@@ -21,7 +21,8 @@ export const en = {
   pause: 'Pause',
   resume: 'Resume',
   newMap: 'New map',
-  paused: 'Paused',
+  pausedHint: 'Paused: you can still give orders. Space to resume.',
+  speed: 'Game speed',
   hint: 'Drag from your village or squad to a target, sweeping over more to send them together. Space: pause.',
 
   victory: 'Victory!',
@@ -57,7 +58,8 @@ export const ru: Strings = {
   pause: 'Пауза',
   resume: 'Продолжить',
   newMap: 'Новая карта',
-  paused: 'Пауза',
+  pausedHint: 'Пауза: приказы можно отдавать. Пробел — продолжить.',
+  speed: 'Скорость игры',
   hint: 'Тяните от своей деревни или отряда к цели, захватывая по пути другие, чтобы отправить их вместе. Пробел — пауза.',
 
   victory: 'Победа!',
