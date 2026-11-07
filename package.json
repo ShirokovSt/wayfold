@@ -1,0 +1,18 @@
+{
+  "name": "wayfold",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A territory game: villages send walking squads that repaint the land",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}

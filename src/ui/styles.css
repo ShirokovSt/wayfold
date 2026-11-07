@@ -1,0 +1,246 @@
+:root {
+  color-scheme: dark;
+  --bg: #2c1e14;
+  --panel: #3b2a1d;
+  --border: #5a4330;
+  --text: #f4ead8;
+  --muted: #c4b49a;
+  --paper: #f5ecd9;
+  --ink: #3b2a1d;
+  --you: #3f7fd6;
+  --rival: #d6493c;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar */
+
+#hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.brand img {
+  width: 28px;
+  height: 28px;
+}
+
+.stats {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.stats.you {
+  border-color: var(--you);
+}
+
+.stats.rival {
+  border-color: var(--rival);
+}
+
+.stats .name {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.stats .label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stats b {
+  min-width: 2ch;
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: #4a3626;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #5a4330;
+}
+
+button.active {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+button.primary {
+  background: var(--you);
+  border-color: #1f4c8c;
+  color: white;
+  font-weight: 700;
+  padding: 8px 22px;
+}
+
+button.primary:hover {
+  background: #4b8ee6;
+}
+
+.language button {
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+/* Board */
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+#board {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+#hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+/* Cards over the board */
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 20, 12, 0.55);
+}
+
+#overlay[hidden] {
+  display: none;
+}
+
+.card {
+  max-width: 520px;
+  margin: 16px;
+  padding: 28px 32px;
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 6px 0 #c9b791, 0 18px 40px rgba(0, 0, 0, 0.4);
+}
+
+.card.small {
+  text-align: center;
+  min-width: 280px;
+}
+
+.card h1 {
+  margin: 0;
+  font-size: 40px;
+  letter-spacing: 0.06em;
+}
+
+.card h2 {
+  margin: 0 0 12px;
+}
+
+.card.won h2 {
+  color: var(--you);
+}
+
+.card.lost h2 {
+  color: var(--rival);
+}
+
+.tagline {
+  margin: 4px 0 18px;
+  font-style: italic;
+  color: #7d6a52;
+}
+
+.rules {
+  margin: 0 0 22px;
+  padding-left: 20px;
+  line-height: 1.5;
+}
+
+.rules li + li {
+  margin-top: 6px;
+}
+
+.muted {
+  color: #7d6a52;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card .language button {
+  color: var(--ink);
+  background: transparent;
+  border-color: #c9b791;
+}
+
+.card .language button.active {
+  background: var(--ink);
+  color: var(--paper);
+}

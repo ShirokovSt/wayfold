@@ -1,0 +1,114 @@
+import { hexDistance, hexToPoint } from '../core/hex'
+import { findPath } from './pathfind'
+import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, MOVE_COST, SQUAD_SPEED } from './rules'
+import { claimAround, paint } from './territory'
+import type { Cell, PlayerId, Squad, Village, World } from './world'
+
+// The one way to give orders, for the player and the AI alike: all the village's people set off
+export function sendSquad(world: World, player: PlayerId, from: Village, to: Cell): Squad | null {
+  if (from.owner !== player) return null
+  const count = Math.floor(from.population)
+  const path = findPath(world.map, from.cell, to)
+  if (count < 1 || !path || path.length < 2) return null
+
+  from.population -= count
+  const { x, y } = hexToPoint(from.cell.hex, 1)
+  const squad: Squad = { id: world.nextId++, owner: player, count, path, step: 0, progress: 0, home: from, x, y, prevX: x, prevY: y }
+  world.squads.push(squad)
+  return squad
+}
+
+// The tile the squad is standing on: it steps onto the next one halfway there
+export function squadCell(squad: Squad): Cell {
+  const next = squad.path[squad.step + 1]
+  return next && squad.progress >= 0.5 ? next : squad.path[squad.step]
+}
+
+export function squadTarget(squad: Squad): Cell {
+  return squad.path[squad.path.length - 1]
+}
+
+export function moveSquads(world: World, dt: number): void {
+  for (const squad of [...world.squads]) {
+    squad.prevX = squad.x
+    squad.prevY = squad.y
+    squad.progress += (SQUAD_SPEED * dt) / MOVE_COST[squad.path[squad.step + 1].terrain]
+    if (squad.progress >= 1) {
+      squad.step++
+      squad.progress -= 1
+    }
+    paint(squadCell(squad), squad.owner)
+    if (squad.step === squad.path.length - 1) arrive(world, squad)
+    placeSquad(squad)
+  }
+}
+
+// Enemy squads that meet lose the same number of people: the smaller one is wiped out
+export function resolveClashes(world: World): void {
+  const squads = world.squads
+  for (let i = 0; i < squads.length; i++) {
+    for (let j = i + 1; j < squads.length; j++) {
+      const a = squads[i]
+      const b = squads[j]
+      if (a.owner === b.owner || a.count === 0 || b.count === 0) continue
+      if (Math.hypot(a.x - b.x, a.y - b.y) < CLASH_DISTANCE) {
+        const losses = Math.min(a.count, b.count)
+        a.count -= losses
+        b.count -= losses
+      }
+    }
+  }
+  world.squads = squads.filter((squad) => squad.count > 0)
+}
+
+function arrive(world: World, squad: Squad): void {
+  const cell = squadTarget(squad)
+  if (cell.village) {
+    enterVillage(world, squad, cell.village)
+    removeSquad(world, squad)
+    return
+  }
+  // A raid ends on open land, and the squad walks back home
+  const home = squad.home.owner === squad.owner ? squad.home : nearestVillage(world, cell, squad.owner)
+  const path = home && findPath(world.map, cell, home.cell)
+  if (!home || !path) {
+    removeSquad(world, squad)
+    return
+  }
+  squad.home = home
+  squad.path = path
+  squad.step = 0
+  squad.progress = 0
+}
+
+function enterVillage(world: World, squad: Squad, village: Village): void {
+  if (village.owner === squad.owner) {
+    village.population += squad.count
+    return
+  }
+  village.population -= squad.count
+  if (village.population < 0) {
+    village.owner = squad.owner
+    village.population = -village.population
+    claimAround(world.map, village, CAPTURE_LAND_RADIUS)
+  }
+}
+
+function nearestVillage(world: World, cell: Cell, owner: PlayerId): Village | null {
+  const own = world.villages.filter((village) => village.owner === owner)
+  own.sort((a, b) => hexDistance(cell.hex, a.cell.hex) - hexDistance(cell.hex, b.cell.hex))
+  return own[0] ?? null
+}
+
+function removeSquad(world: World, squad: Squad): void {
+  squad.count = 0
+  world.squads = world.squads.filter((other) => other !== squad)
+}
+
+function placeSquad(squad: Squad): void {
+  const from = hexToPoint(squad.path[squad.step].hex, 1)
+  const next = squad.path[squad.step + 1]
+  const to = next ? hexToPoint(next.hex, 1) : from
+  squad.x = from.x + (to.x - from.x) * squad.progress
+  squad.y = from.y + (to.y - from.y) * squad.progress
+}
