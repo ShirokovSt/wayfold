@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { findPath } from './pathfind'
-import { addVillage, testWorld } from './testWorld'
+import { addVillage, testWorld } from './testWorld.testing'
 
 describe('findPath', () => {
   it('goes around mountains', () => {

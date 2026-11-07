@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SQUAD_SPEED, TICK_SECONDS } from './rules'
 import { redirectSquad, sendSquad } from './squads'
-import { addVillage, testWorld } from './testWorld'
+import { addVillage, testWorld } from './testWorld.testing'
 import { tick } from './tick'
 import { growthRate } from './villages'
 import { HUMAN, RIVAL, type World } from './world'
