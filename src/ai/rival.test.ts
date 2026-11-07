@@ -7,13 +7,18 @@ import { HUMAN, RIVAL } from '../sim/world'
 import { Rival } from './rival'
 
 describe('rival AI', () => {
-  it('starts expanding within the first seconds', () => {
+  it('waits a little, then starts expanding', () => {
     const world = createWorld(5)
     const rival = new Rival(RIVAL, createRandom(1))
-    for (let t = 0; t < 20; t += TICK_SECONDS) {
-      rival.update(world, TICK_SECONDS)
-      tick(world, TICK_SECONDS)
+    const play = (seconds: number) => {
+      for (let t = 0; t < seconds; t += TICK_SECONDS) {
+        rival.update(world, TICK_SECONDS)
+        tick(world, TICK_SECONDS)
+      }
     }
+    play(9)
+    expect(world.squads).toHaveLength(0)
+    play(40)
     expect(world.villages.filter((v) => v.owner === RIVAL).length).toBeGreaterThan(1)
   })
 

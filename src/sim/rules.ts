@@ -18,7 +18,7 @@ export const MOVE_COST: Record<Terrain, number> = {
 }
 
 export const SQUAD_SPEED = 1.0 // field tiles per second
-export const CLASH_DISTANCE = 0.7 // enemy squads closer than this (in tiles) fight
+export const CLASH_DISTANCE = 0.7 // enemy squads closer than this fight (in hex radii; neighbor centers are 1.73 apart)
 
 export const START_POPULATION = 10
 export const NEUTRAL_GARRISON = { min: 5, max: 12 }

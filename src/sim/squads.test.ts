@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SQUAD_SPEED, TICK_SECONDS } from './rules'
-import { sendSquad } from './squads'
+import { redirectSquad, sendSquad } from './squads'
 import { addVillage, testWorld } from './testWorld'
 import { tick } from './tick'
 import { growthRate } from './villages'
@@ -86,5 +86,61 @@ describe('villages', () => {
     addVillage(world, 6, 2, RIVAL, 1)
     run(world, 5)
     expect(neutral.population).toBe(6)
+  })
+})
+
+describe('redirected squads', () => {
+  it('turn around on the way and head for the new target', () => {
+    const world = testWorld(FIELD)
+    const home = addVillage(world, 0, 0, HUMAN, 5)
+    addVillage(world, 6, 2, RIVAL, 1)
+    const squad = sendSquad(world, HUMAN, home, world.map.cellAtOffset(6, 0)!)!
+    run(world, 1.7 / SQUAD_SPEED)
+    const before = { x: squad.x, y: squad.y }
+
+    const newTarget = world.map.cellAtOffset(2, 2)!
+    expect(redirectSquad(world, HUMAN, squad, newTarget)).toBe(true)
+    run(world, TICK_SECONDS)
+    expect(Math.hypot(squad.x - before.x, squad.y - before.y)).toBeLessThan(0.2) // one tick of walking, no jump back to a tile center
+    run(world, 3 / SQUAD_SPEED)
+    expect(newTarget.owner).toBe(HUMAN)
+  })
+
+  it('can be called back home', () => {
+    const world = testWorld(FIELD)
+    const home = addVillage(world, 0, 0, HUMAN, 5)
+    addVillage(world, 6, 2, RIVAL, 1)
+    const squad = sendSquad(world, HUMAN, home, world.map.cellAtOffset(6, 0)!)!
+    run(world, 0.3)
+    expect(redirectSquad(world, HUMAN, squad, home.cell)).toBe(true)
+    run(world, 1)
+    expect(world.squads).toHaveLength(0)
+    expect(home.population).toBeGreaterThanOrEqual(5)
+  })
+
+  it('only obey their owner', () => {
+    const world = testWorld(FIELD)
+    const enemy = addVillage(world, 6, 0, RIVAL, 5)
+    addVillage(world, 0, 0, HUMAN, 1)
+    const squad = sendSquad(world, RIVAL, enemy, world.map.cellAtOffset(2, 0)!)!
+    expect(redirectSquad(world, HUMAN, squad, world.map.cellAtOffset(6, 2)!)).toBe(false)
+  })
+})
+
+describe('capitals', () => {
+  it('move to the most populous village when the capital falls', () => {
+    const world = testWorld(FIELD)
+    const capital = addVillage(world, 3, 0, RIVAL, 2, true)
+    const small = addVillage(world, 6, 2, RIVAL, 3)
+    const big = addVillage(world, 0, 2, RIVAL, 9)
+    const attacker = addVillage(world, 0, 0, HUMAN, 10, true)
+    sendSquad(world, HUMAN, attacker, capital.cell)
+    run(world, 3 / SQUAD_SPEED + 0.1)
+
+    expect(capital.owner).toBe(HUMAN)
+    expect(capital.capital).toBe(false) // the human already has a capital
+    expect(attacker.capital).toBe(true)
+    expect(big.capital).toBe(true)
+    expect(small.capital).toBe(false)
   })
 })

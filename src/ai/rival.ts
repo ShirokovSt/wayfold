@@ -6,12 +6,14 @@ import { sendSquad, squadTarget } from '../sim/squads'
 import { growthRate } from '../sim/villages'
 import type { Cell, PlayerId, Village, World } from '../sim/world'
 
-const THINK_SECONDS = 1.8
-const SAFETY_MARGIN = 2 // extra people sent on top of what the target should have on arrival
+// How the rival plays: how soon and how often it moves, and how cautiously
+const FIRST_MOVE_SECONDS = 10
+const THINK_SECONDS = 3.5
+const SAFETY_MARGIN = 4 // extra people sent on top of what the target should have on arrival
 
-// A simple opponent: every couple of seconds it makes one move — defend, capture or raid
+// A simple opponent: every few seconds it makes one move — defend, capture or raid
 export class Rival {
-  private timer = THINK_SECONDS
+  private timer = FIRST_MOVE_SECONDS
 
   constructor(
     private readonly player: PlayerId,
@@ -21,7 +23,7 @@ export class Rival {
   update(world: World, dt: number): void {
     this.timer -= dt
     if (this.timer > 0) return
-    this.timer = THINK_SECONDS * (0.7 + this.random() * 0.6)
+    this.timer = THINK_SECONDS * (0.8 + this.random() * 0.4)
     this.defend(world) || this.capture(world) || this.raid(world)
   }
 

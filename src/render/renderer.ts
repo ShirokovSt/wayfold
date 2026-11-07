@@ -1,7 +1,7 @@
 import type { Drag } from '../input/pointer'
 import { HUMAN, type Squad, type World } from '../sim/world'
 import { drawDecor, drawGround, drawTable, drawTerritory, hexPath, tileCenter } from './board'
-import { drawBadge, drawPerson, drawVillage } from './figures'
+import { drawBadge, drawCrown, drawPerson, drawVillage } from './figures'
 import { Layout } from './layout'
 import { ownerTone } from './palette'
 
@@ -64,6 +64,7 @@ export class Renderer {
     for (const village of this.world.villages) {
       const { x, y } = tileCenter(this.layout, village.cell)
       drawVillage(ctx, x, y, size, ownerTone(village.owner), time)
+      if (village.capital) drawCrown(ctx, x - size * 0.05, y - size * 0.5, size, time)
     }
     const squads = [...this.world.squads].sort((a, b) => a.y - b.y)
     for (const squad of squads) this.drawSquad(squad, alpha, time)
@@ -100,31 +101,42 @@ export class Renderer {
     if (squad.count > 1) drawBadge(this.ctx, x, y - size * 0.38, String(squad.count), size * 0.8, tone)
   }
 
-  // The route a squad would take, shown while dragging
+  // While dragging: rings around the gathered villages and squads, and the routes they would take
   private drawDrag(drag: Drag): void {
     const ctx = this.ctx
     const size = this.layout.size
     const tone = ownerTone(HUMAN)
     ctx.lineWidth = size * 0.07
     ctx.strokeStyle = tone.light
-    hexPath(ctx, tileCenter(this.layout, drag.from.cell), size * 0.86)
-    ctx.stroke()
-    if (!drag.path) return
-
-    ctx.beginPath()
-    for (const cell of drag.path) {
-      const { x, y } = tileCenter(this.layout, cell)
-      ctx.lineTo(x, y)
+    for (const village of drag.villages) {
+      hexPath(ctx, tileCenter(this.layout, village.cell), size * 0.86)
+      ctx.stroke()
     }
+    for (const squad of drag.squads) {
+      const { x, y } = this.layout.toScreen(squad.x, squad.y)
+      ctx.beginPath()
+      ctx.ellipse(x, y + size * 0.1, size * 0.45, size * 0.3, 0, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+
     ctx.setLineDash([size * 0.12, size * 0.16])
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.lineWidth = size * 0.1
     ctx.strokeStyle = tone.dark
-    ctx.stroke()
+    for (const path of drag.paths) {
+      ctx.beginPath()
+      for (const cell of path) {
+        const { x, y } = tileCenter(this.layout, cell)
+        ctx.lineTo(x, y)
+      }
+      ctx.stroke()
+    }
     ctx.setLineDash([])
-    hexPath(ctx, tileCenter(this.layout, drag.path[drag.path.length - 1]), size * 0.86)
-    ctx.lineWidth = size * 0.07
-    ctx.stroke()
+    if (drag.target && drag.paths.length > 0) {
+      hexPath(ctx, tileCenter(this.layout, drag.target), size * 0.86)
+      ctx.lineWidth = size * 0.07
+      ctx.stroke()
+    }
   }
 }

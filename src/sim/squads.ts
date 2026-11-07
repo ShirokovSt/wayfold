@@ -2,6 +2,7 @@ import { hexDistance, hexToPoint } from '../core/hex'
 import { findPath } from './pathfind'
 import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, MOVE_COST, SQUAD_SPEED } from './rules'
 import { claimAround, paint } from './territory'
+import { ensureCapital } from './villages'
 import type { Cell, PlayerId, Squad, Village, World } from './world'
 
 // The one way to give orders, for the player and the AI alike: all the village's people set off
@@ -13,9 +14,23 @@ export function sendSquad(world: World, player: PlayerId, from: Village, to: Cel
 
   from.population -= count
   const { x, y } = hexToPoint(from.cell.hex, 1)
-  const squad: Squad = { id: world.nextId++, owner: player, count, path, step: 0, progress: 0, home: from, x, y, prevX: x, prevY: y }
+  const squad: Squad = { id: world.nextId++, owner: player, count, path, step: 0, progress: 0, home: from, start: null, x, y, prevX: x, prevY: y }
   world.squads.push(squad)
   return squad
+}
+
+// A new destination for a squad on the march; it turns around from where it stands right now
+export function redirectSquad(world: World, player: PlayerId, squad: Squad, to: Cell): boolean {
+  if (squad.owner !== player || !world.squads.includes(squad)) return false
+  const from = squadCell(squad)
+  // Sent back to the tile it stands on, it just walks to the tile's center
+  const path = from === to ? [from, from] : findPath(world.map, from, to)
+  if (!path || path.length < 2) return false
+  squad.path = path
+  squad.step = 0
+  squad.progress = 0
+  squad.start = { x: squad.x, y: squad.y }
+  return true
 }
 
 // The tile the squad is standing on: it steps onto the next one halfway there
@@ -79,6 +94,7 @@ function arrive(world: World, squad: Squad): void {
   squad.path = path
   squad.step = 0
   squad.progress = 0
+  squad.start = null
 }
 
 function enterVillage(world: World, squad: Squad, village: Village): void {
@@ -88,9 +104,13 @@ function enterVillage(world: World, squad: Squad, village: Village): void {
   }
   village.population -= squad.count
   if (village.population < 0) {
+    const loser = village.owner
     village.owner = squad.owner
     village.population = -village.population
+    village.capital = false // a captured capital becomes an ordinary village
     claimAround(world.map, village, CAPTURE_LAND_RADIUS)
+    if (loser !== null) ensureCapital(world, loser, village.cell)
+    ensureCapital(world, squad.owner, village.cell)
   }
 }
 
@@ -106,7 +126,7 @@ function removeSquad(world: World, squad: Squad): void {
 }
 
 function placeSquad(squad: Squad): void {
-  const from = hexToPoint(squad.path[squad.step].hex, 1)
+  const from = squad.step === 0 && squad.start ? squad.start : hexToPoint(squad.path[squad.step].hex, 1)
   const next = squad.path[squad.step + 1]
   const to = next ? hexToPoint(next.hex, 1) : from
   squad.x = from.x + (to.x - from.x) * squad.progress

@@ -29,4 +29,5 @@ export const TABLE = { center: '#6b4a32', edge: '#3a271a', grain: 'rgba(255, 230
 export const WOOD = { trunk: '#7a5134', roof: '#5a3b26', wall: '#f1e4c6', door: '#5a3b26' }
 export const LEAVES = ['#4f7f3a', '#5c8d3f', '#467334']
 export const ROCK = { light: '#cfc4b0', dark: '#8a7e6a', snow: '#f7f5ee' }
+export const GOLD = { main: '#f2c14e', dark: '#8a6514' }
 export const SHADOW = 'rgba(40, 25, 10, 0.25)'

@@ -91,7 +91,7 @@ function placeVillages(map: GameMap, random: Random): Village[] | null {
 
   const villages: Village[] = []
   const addVillage = (cell: Cell, owner: Owner, population: number) => {
-    const village = { id: villages.length, cell, owner, population }
+    const village = { id: villages.length, cell, owner, population, capital: owner !== null }
     cell.terrain = 'field'
     cell.village = village
     cell.owner = owner

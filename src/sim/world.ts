@@ -1,4 +1,4 @@
-import type { Hex } from '../core/hex'
+import type { Hex, Point } from '../core/hex'
 import type { GameMap } from './map'
 
 export type PlayerId = 0 | 1
@@ -24,6 +24,7 @@ export interface Village {
   readonly cell: Cell
   owner: Owner
   population: number // fractional: grows a little every tick
+  capital: boolean // each player has one capital, marked with a crown
 }
 
 export interface Squad {
@@ -34,7 +35,8 @@ export interface Squad {
   step: number // index in path of the cell the squad is leaving
   progress: number // 0..1 on the way from path[step] to path[step + 1]
   home: Village // where the squad returns after a raid
-  // Position in tile units; the previous tick's one lets the renderer move squads smoothly
+  start: Point | null // where a redirected squad set off from, instead of the center of path[0]
+  // Position in hex radii (as hexToPoint with size 1); the previous tick's one lets the renderer move squads smoothly
   x: number
   y: number
   prevX: number

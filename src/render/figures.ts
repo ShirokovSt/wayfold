@@ -1,5 +1,5 @@
 import { ellipse } from './board'
-import { SHADOW, type Tone, WOOD } from './palette'
+import { GOLD, SHADOW, type Tone, WOOD } from './palette'
 
 // Village pieces: three little houses with roofs in the owner's color and a flag
 export function drawVillage(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number): void {
@@ -54,6 +54,34 @@ function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, size: num
   ctx.lineWidth = size * 0.025
   ctx.fill()
   ctx.stroke()
+}
+
+// The capital's mark: a golden crown floating above the houses
+export function drawCrown(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, time: number): void {
+  const w = size * 0.2 // half the crown's width
+  const h = size * 0.24
+  const top = y - h + Math.sin(time * 2) * size * 0.02
+  ctx.beginPath()
+  ctx.moveTo(x - w, top + h)
+  ctx.lineTo(x - w * 1.1, top + h * 0.25)
+  ctx.lineTo(x - w * 0.45, top + h * 0.6)
+  ctx.lineTo(x, top)
+  ctx.lineTo(x + w * 0.45, top + h * 0.6)
+  ctx.lineTo(x + w * 1.1, top + h * 0.25)
+  ctx.lineTo(x + w, top + h)
+  ctx.closePath()
+  ctx.fillStyle = GOLD.main
+  ctx.strokeStyle = GOLD.dark
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = size * 0.03
+  ctx.fill()
+  ctx.stroke()
+  for (const [px, py] of [[-1.1, 0.25], [0, 0], [1.1, 0.25]]) {
+    ctx.beginPath()
+    ctx.arc(x + px * w, top + py * h, size * 0.035, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+  }
 }
 
 // A small walker; `phase` drives the bobbing and the swinging legs

@@ -19,7 +19,7 @@ export class Layout {
     this.originY = (height - boardHeight * this.size) / 2 + this.size
   }
 
-  // From tile units (as squads store their position) to screen pixels
+  // From hex radii (as squads store their position) to screen pixels
   toScreen(x: number, y: number): Point {
     return { x: this.originX + x * this.size, y: this.originY + y * this.size }
   }
@@ -29,7 +29,12 @@ export class Layout {
     return this.toScreen(point.x, point.y)
   }
 
+  // Back from screen pixels to hex radii
+  fromScreen(x: number, y: number): Point {
+    return { x: (x - this.originX) / this.size, y: (y - this.originY) / this.size }
+  }
+
   screenToHex(x: number, y: number): Hex {
-    return pointToHex({ x: (x - this.originX) / this.size, y: (y - this.originY) / this.size }, 1)
+    return pointToHex(this.fromScreen(x, y), 1)
   }
 }
