@@ -44,18 +44,19 @@ export const en = {
 
   pause: 'Pause',
   resume: 'Resume',
+  menu: 'Menu',
+  continue: 'Continue',
   newMap: 'New map',
-  cancel: 'Cancel',
+  back: 'Back',
   pausedHint: 'Paused: you can still give orders. Space to resume.',
   speed: 'Game speed',
-  hint: 'Drag from a village or squad to a target, sweeping over more to send them together. Click your field to build. Space: pause.',
 
   victory: 'Victory!',
   defeat: 'Defeat',
   victoryText: 'Every village flies your flag.',
   defeatText: 'Your last village has fallen.',
   matchTime: 'Match time',
-  playAgain: 'Play again',
+  toMenu: 'Menu',
 }
 
 export type Strings = typeof en
@@ -102,16 +103,17 @@ export const ru: Strings = {
 
   pause: 'Пауза',
   resume: 'Продолжить',
+  menu: 'Меню',
+  continue: 'Продолжить',
   newMap: 'Новая карта',
-  cancel: 'Отмена',
+  back: 'Назад',
   pausedHint: 'Пауза: приказы можно отдавать. Пробел — продолжить.',
   speed: 'Скорость игры',
-  hint: 'Тяните от деревни или отряда к цели, захватывая по пути другие, чтобы отправить их вместе. Нажмите на своё поле, чтобы строить. Пробел — пауза.',
 
   victory: 'Победа!',
   defeat: 'Поражение',
   victoryText: 'Над каждой деревней ваш флаг.',
   defeatText: 'Ваша последняя деревня пала.',
   matchTime: 'Время партии',
-  playAgain: 'Сыграть ещё',
+  toMenu: 'В меню',
 }

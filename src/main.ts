@@ -26,12 +26,13 @@ const canvas = document.querySelector<HTMLCanvasElement>('#board')!
 const renderer = new Renderer(canvas, game.world)
 const input = new PointerInput(canvas, renderer.layout, game)
 const screens = new Screens(document.querySelector('#overlay')!)
-const hud = new Hud(document.querySelector('#hud')!, game, { togglePause, newMap: chooseNewMap, setSpeed })
+const hud = new Hud(document.querySelector('#hud')!, game, { togglePause, openMenu, setSpeed })
 const stage = document.querySelector<HTMLElement>('.stage')!
 const buildMenu = new BuildMenu(stage, game, renderer.layout)
 const camera = new CameraControls(canvas, renderer.layout)
 const banner = document.querySelector<HTMLElement>('#banner')!
 let endShown = false
+let pausedBeforeMenu = false
 
 input.onPress = () => buildMenu.close()
 input.onTileClick = (cell) => buildMenu.open(cell)
@@ -53,7 +54,7 @@ function play(): void {
 
 // The pause leaves the board open: you can still give orders, they start when the game resumes
 function togglePause(): void {
-  if (game.world.winner !== null || screens.choosingMap) return
+  if (game.world.winner !== null || screens.isOpen) return
   if (game.paused) {
     play()
   } else {
@@ -66,25 +67,35 @@ function setSpeed(speed: number): void {
   game.speed = speed
 }
 
-// The game waits behind the card; Cancel goes back to it as it was
+// The menu holds the match on a real pause: no orders behind it. Continue goes back to it as it was
+function openMenu(): void {
+  if (!screens.isOpen) {
+    pausedBeforeMenu = game.paused
+    game.paused = true
+    banner.hidden = true
+    input.drag = null
+    input.hover = null
+    buildMenu.close()
+  }
+  const inMatch = game.started && game.world.winner === null
+  screens.menu(chooseNewMap, inMatch ? continueMatch : undefined)
+}
+
+function continueMatch(): void {
+  screens.hide()
+  game.paused = pausedBeforeMenu
+  banner.hidden = !pausedBeforeMenu
+}
+
+// The settings change only when Play is pressed; Back leaves them as they were
 function chooseNewMap(): void {
-  if (screens.choosingMap) return
-  const wasPaused = game.paused
-  const inMatch = game.world.winner === null
   let settings = game.settings
-  game.paused = true
-  banner.hidden = true
   const choice = { current: () => settings, change: (next: typeof settings) => (settings = next) }
   const start = () => {
     game.changeSettings(settings)
     newMap()
   }
-  const cancel = () => {
-    screens.hide()
-    game.paused = wasPaused
-    banner.hidden = !wasPaused
-  }
-  screens.newMap(choice, start, inMatch && game.started ? cancel : undefined)
+  screens.newMap(choice, start, openMenu)
 }
 
 function newMap(): void {
@@ -96,11 +107,7 @@ function newMap(): void {
   play()
 }
 
-const hint = document.querySelector('#hint')!
-const showTexts = () => {
-  hint.textContent = t().hint
-  banner.textContent = t().pausedHint
-}
+const showTexts = () => (banner.textContent = t().pausedHint)
 showTexts()
 onLanguageChange(showTexts)
 
@@ -108,20 +115,24 @@ new ResizeObserver(() => {
   renderer.resize()
   buildMenu.close() // it would stay where the tile used to be
 }).observe(canvas)
+// Esc first cancels what is in hand, then opens the menu; on a card it goes back
 window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') buildMenu.close()
-  if (event.code !== 'Space') return
-  event.preventDefault() // otherwise Space would also press the focused button
-  togglePause()
+  if (screens.isOpen) {
+    if (event.key === 'Escape') screens.escape()
+    return
+  }
+  if (event.key === 'Escape') {
+    if (input.drag) input.drag = null
+    else if (buildMenu.cell) buildMenu.close()
+    else openMenu()
+  } else if (event.code === 'Space') {
+    event.preventDefault() // otherwise Space would also press the focused button
+    togglePause()
+  } else {
+    camera.key(event)
+  }
 })
-screens.start(play, {
-  current: () => game.settings,
-  change: (settings) => {
-    game.changeSettings(settings)
-    game.restart(Date.now())
-    renderer.setWorld(game.world)
-  },
-})
+openMenu()
 
 // Fixed-step simulation: ticks run at the same rate whatever the frame rate is
 let lastTime = performance.now()
@@ -147,7 +158,7 @@ function frame(now: number): void {
   const winner = game.world.winner
   if (winner !== null && !endShown) {
     endShown = true
-    screens.end(winner === HUMAN, game.world.time, chooseNewMap)
+    screens.end(winner === HUMAN, game.world.time, chooseNewMap, openMenu)
   }
 }
 

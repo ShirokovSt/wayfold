@@ -3,69 +3,84 @@ import type { MapSettings } from '../sim/mapgen'
 import { MAP_SIZES, MAP_TYPES } from '../sim/world'
 import { button, element } from './dom'
 import { formatTime } from './hud'
-import { languageSwitch } from './languageSwitch'
+import { languageSelect } from './languageSelect'
 
-// The map settings as the start screen shows and changes them
+// The map settings as the new map card shows and changes them
 export interface MapChoice {
   current(): MapSettings
   change(settings: MapSettings): void
 }
 
-// Cards over the board: the start screen and the end of the match
+// Cards over the board: the menu, the new map card and the end of the match
 export class Screens {
-  choosingMap = false // the new map card is open: the game behind it must not be resumed
   private content: (() => HTMLElement) | null = null
+  private onEscape: (() => void) | null = null
 
   constructor(private readonly root: HTMLElement) {
     onLanguageChange(() => this.refresh())
   }
 
-  start(onPlay: () => void, map: MapChoice): void {
-    this.show(() =>
+  get isOpen(): boolean {
+    return this.content !== null
+  }
+
+  // Without onContinue there is no match to go back to
+  menu(onNewMap: () => void, onContinue?: () => void): void {
+    this.show(onContinue ?? null, () => {
+      const buttons = element('div', 'menu-buttons')
+      if (onContinue) buttons.append(button(t().continue, onContinue, 'primary'))
+      buttons.append(button(t().newMap, onNewMap, onContinue ? '' : 'primary'))
+      return element(
+        'div',
+        'card menu',
+        element('h1', '', t().title),
+        element('p', 'tagline', t().tagline),
+        buttons,
+        languageSelect(),
+      )
+    })
+  }
+
+  newMap(map: MapChoice, onPlay: () => void, onBack: () => void): void {
+    this.show(onBack, () =>
       element(
         'div',
         'card',
-        element('h1', '', t().title),
-        element('p', 'tagline', t().tagline),
-        element('ul', 'rules', ...t().rules.map((rule) => element('li', '', rule))),
+        element('h2', '', t().newMap),
         ...this.mapChoices(map),
-        element('div', 'actions', button(t().play, onPlay, 'primary'), languageSwitch()),
+        element('div', 'actions', button(t().play, onPlay, 'primary'), button(t().back, onBack)),
       ),
     )
   }
 
-  // Picking the next map; without onCancel there is no match to go back to
-  newMap(map: MapChoice, onPlay: () => void, onCancel?: () => void): void {
-    this.choosingMap = true
-    this.show(() => {
-      const actions = element('div', 'actions', button(t().play, onPlay, 'primary'))
-      if (onCancel) actions.append(button(t().cancel, onCancel))
-      return element('div', 'card', element('h2', '', t().newMap), ...this.mapChoices(map), actions)
-    })
-  }
-
-  end(won: boolean, seconds: number, onPlayAgain: () => void): void {
-    this.show(() =>
+  end(won: boolean, seconds: number, onNewMap: () => void, onMenu: () => void): void {
+    this.show(null, () =>
       element(
         'div',
         `card small ${won ? 'won' : 'lost'}`,
         element('h2', '', won ? t().victory : t().defeat),
         element('p', '', won ? t().victoryText : t().defeatText),
         element('p', 'muted', `${t().matchTime}: ${formatTime(seconds)}`),
-        button(t().playAgain, onPlayAgain, 'primary'),
+        element('div', 'actions centered', button(t().newMap, onNewMap, 'primary'), button(t().toMenu, onMenu)),
       ),
     )
   }
 
+  // Esc on a card works like its way back, if it has one
+  escape(): void {
+    this.onEscape?.()
+  }
+
   hide(): void {
-    this.choosingMap = false
     this.content = null
+    this.onEscape = null
     this.root.hidden = true
     this.root.replaceChildren()
   }
 
-  private show(content: () => HTMLElement): void {
+  private show(onEscape: (() => void) | null, content: () => HTMLElement): void {
     this.content = content
+    this.onEscape = onEscape
     this.refresh()
   }
 

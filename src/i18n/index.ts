@@ -2,6 +2,8 @@ import { en, ru, type Strings } from './strings'
 
 export type Language = 'en' | 'ru'
 export const LANGUAGES: Language[] = ['en', 'ru']
+// Each language is named in itself, so anyone can find their own
+export const LANGUAGE_NAMES: Record<Language, string> = { en: 'English', ru: 'Русский' }
 
 const DICTIONARIES: Record<Language, Strings> = { en, ru }
 const STORAGE_KEY = 'wayfold.language'

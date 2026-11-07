@@ -39,17 +39,17 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.brand {
+.menu-button {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 3px 12px 3px 6px;
   font-weight: 700;
-  letter-spacing: 0.05em;
 }
 
-.brand img {
-  width: 28px;
-  height: 28px;
+.menu-button img {
+  width: 24px;
+  height: 24px;
 }
 
 .stats {
@@ -129,11 +129,6 @@ button.primary:hover {
   background: #9a63d6;
 }
 
-.language button {
-  padding: 5px 8px;
-  font-size: 13px;
-}
-
 .speed {
   display: flex;
   margin-right: 6px;
@@ -166,18 +161,6 @@ button.primary:hover {
   width: 100%;
   height: 100%;
   touch-action: none;
-}
-
-#hint {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 6px;
-  margin: 0;
-  text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-  pointer-events: none;
 }
 
 #banner {
@@ -276,7 +259,7 @@ button.primary:hover {
 .zoom {
   position: absolute;
   right: 12px;
-  bottom: 28px;
+  bottom: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -298,7 +281,8 @@ button.primary:hover {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(30, 20, 12, 0.55);
+  background: rgba(30, 20, 12, 0.5);
+  backdrop-filter: blur(4px);
 }
 
 #overlay[hidden] {
@@ -346,14 +330,52 @@ button.primary:hover {
   color: #7d6a52;
 }
 
-.rules {
-  margin: 0 0 22px;
-  padding-left: 20px;
-  line-height: 1.5;
+/* The menu: title in the middle, a column of buttons, the language below */
+
+.card.menu {
+  min-width: 340px;
+  text-align: center;
 }
 
-.rules li + li {
-  margin-top: 6px;
+.card.menu .tagline {
+  margin-bottom: 24px;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 220px;
+  margin: 0 auto 24px;
+}
+
+.card .menu-buttons button:not(.primary) {
+  color: var(--ink);
+  background: transparent;
+  border-color: #c9b791;
+  padding: 8px 22px;
+}
+
+.card .menu-buttons button:not(.primary):hover {
+  background: #efe3c8;
+}
+
+.language {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #7d6a52;
+  font-size: 14px;
+}
+
+.language select {
+  font: inherit;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid #c9b791;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
 }
 
 .muted {
@@ -404,13 +426,7 @@ button.primary:hover {
   border-color: #c9b791;
 }
 
-.card .language button {
-  color: var(--ink);
-  background: transparent;
-  border-color: #c9b791;
-}
-
-.card .language button.active {
-  background: var(--ink);
-  color: var(--paper);
+.actions.centered {
+  justify-content: center;
+  gap: 10px;
 }

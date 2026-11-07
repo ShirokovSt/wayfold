@@ -13,7 +13,6 @@ export class CameraControls {
     private readonly layout: Layout,
   ) {
     canvas.addEventListener('wheel', (event) => this.wheel(event), { passive: false })
-    window.addEventListener('keydown', (event) => this.key(event))
   }
 
   zoomIn(): void {
@@ -39,7 +38,8 @@ export class CameraControls {
     this.onChange()
   }
 
-  private key(event: KeyboardEvent): void {
+  // Called by the game only while no card covers the board
+  key(event: KeyboardEvent): void {
     const pans: Record<string, [number, number]> = {
       ArrowLeft: [PAN_STEP, 0], KeyA: [PAN_STEP, 0],
       ArrowRight: [-PAN_STEP, 0], KeyD: [-PAN_STEP, 0],

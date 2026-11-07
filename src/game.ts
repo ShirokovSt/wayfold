@@ -11,7 +11,7 @@ export class Game {
   world!: World
   settings: MapSettings = loadSettings()
   paused = true
-  started = false // false while the start screen is up
+  started = false // false until a match is started from the menu
   speed = 1 // how many game seconds pass in a real second
   private rival!: Rival
 

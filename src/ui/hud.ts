@@ -4,17 +4,16 @@ import { onLanguageChange, t } from '../i18n'
 import { landShare } from '../sim/territory'
 import { HUMAN, PLAYERS, type PlayerId, type World } from '../sim/world'
 import { button, element } from './dom'
-import { languageSwitch } from './languageSwitch'
 
 const SPEEDS = [0.5, 1, 2]
 
 interface Actions {
   togglePause(): void
-  newMap(): void
+  openMenu(): void
   setSpeed(speed: number): void
 }
 
-// The top bar: both players' numbers, the match clock and the buttons
+// The top bar holds only the match: the menu button, both players' numbers, the clock, speed and pause
 export class Hud {
   private values: { player: PlayerId; villages: HTMLElement; people: HTMLElement; land: HTMLElement; gold: HTMLElement }[] = []
   private clock = element('span', 'clock')
@@ -38,7 +37,7 @@ export class Hud {
       setText(people, String(countPeople(world, player)))
       setText(land, `${Math.round(landShare(world, player) * 100)}%`)
     }
-    setText(this.clock, `${t().mapTypes[world.mapType]} · ${t().mapSizes[this.game.settings.size]} · ${formatTime(world.time)}`)
+    setText(this.clock, formatTime(world.time))
     setText(this.pauseButton, this.game.paused && this.game.started ? t().resume : t().pause)
     SPEEDS.forEach((speed, i) => this.speedButtons[i].classList.toggle('active', speed === this.game.speed))
   }
@@ -47,6 +46,9 @@ export class Hud {
     const logo = element('img', '')
     logo.src = logoUrl
     logo.alt = ''
+    const menu = button(t().menu, () => this.actions.openMenu(), 'menu-button')
+    menu.prepend(logo)
+    menu.title = `${t().menu} (Esc)`
     this.values = []
     const stats = PLAYERS.map((player) => {
       const value = () => element('b', '')
@@ -66,10 +68,10 @@ export class Hud {
     const speeds = element('div', 'speed', ...this.speedButtons)
     speeds.title = t().speed
     this.root.replaceChildren(
-      element('div', 'brand', logo, t().title),
+      menu,
       ...stats,
       this.clock,
-      element('div', 'group', speeds, this.pauseButton, button(t().newMap, () => this.actions.newMap()), languageSwitch()),
+      element('div', 'group', speeds, this.pauseButton),
     )
     this.update()
   }

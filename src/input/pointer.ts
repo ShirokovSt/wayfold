@@ -44,9 +44,6 @@ export class PointerInput {
       this.pan = null
     })
     canvas.addEventListener('pointerleave', () => (this.hover = null))
-    window.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') this.drag = null
-    })
   }
 
   private press(event: PointerEvent): void {
