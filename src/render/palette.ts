@@ -33,7 +33,5 @@ export const GOLD = { main: '#f2c14e', dark: '#8a6514' }
 export const STEEL = { main: '#b8c0c8', dark: '#5d666f' }
 export const STONE = { main: '#b4aca0', dark: '#6e665b' }
 export const FARM = { soil: '#9a6b43', wheat: '#e3c25a', hay: '#e8c35c', hayDark: '#9c7a2a' }
-export const FORGE_GLOW = '#f08a2b'
-export const SMOKE = '#d8d4cc'
 export const SANDBAR = { sand: '#dcc58e', edge: '#b39b62', pebble: '#9c8f74' }
 export const SHADOW = 'rgba(40, 25, 10, 0.25)'

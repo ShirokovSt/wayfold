@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { build, canBuildOn } from './economy'
+import { build, canBuildOn, upgradeToTown } from './economy'
 import { estateVillage } from './estates'
 import { fireTowers } from './towers'
-import { BUILDING_COST, GOLD_PER_TILE, SQUAD_SPEED, TICK_SECONDS } from './rules'
+import { BUILDING_COST, GOLD_PER_TILE, SQUAD_SPEED, TICK_SECONDS, TOWN_COST } from './rules'
 import { sendSquad } from './squads'
 import { addVillage, handmadeWorld } from './handmade'
 import { tick } from './tick'
@@ -68,8 +68,8 @@ describe('buildings', () => {
 
   it('cannot be bought without enough gold', () => {
     const world = startingWorld()
-    world.gold[HUMAN] = BUILDING_COST.forge - 1
-    expect(build(world, HUMAN, world.map.cellAtOffset(1, 0)!, 'forge')).toBe(false)
+    world.gold[HUMAN] = BUILDING_COST.tower - 1
+    expect(build(world, HUMAN, world.map.cellAtOffset(1, 0)!, 'tower')).toBe(false)
   })
 
   it('farm makes its village grow faster', () => {
@@ -78,18 +78,6 @@ describe('buildings', () => {
     const before = growthRate(world, village)
     build(world, HUMAN, world.map.cellAtOffset(1, 0)!, 'farm')
     expect(growthRate(world, village)).toBeGreaterThan(before)
-  })
-
-  it('forge sends soldiers worth two each', () => {
-    const world = startingWorld()
-    const village = world.villages[0]
-    build(world, HUMAN, world.map.cellAtOffset(1, 1)!, 'forge')
-    const target = world.villages[1]
-    target.population = 15
-    const squad = sendSquad(world, HUMAN, village, target.cell)!
-    expect(squad.strength).toBe(2)
-    run(world, 9 / SQUAD_SPEED)
-    expect(target.owner).toBe(HUMAN) // 10 soldiers (strength 20) beat the 15+ people grown meanwhile
   })
 
   it('tower shoots passing enemies', () => {
@@ -190,5 +178,52 @@ describe('tower placement', () => {
     expect(build(world, HUMAN, doorstep, 'tower')).toBe(false)
     expect(build(world, HUMAN, doorstep, 'farm')).toBe(true)
     expect(build(world, HUMAN, world.map.cellAtOffset(1, 1)!, 'tower')).toBe(true) // three steps away
+  })
+})
+
+describe('towns', () => {
+  function startingWorld(): World {
+    const world = handmadeWorld(FIELD)
+    addVillage(world, 0, 0, HUMAN, 10)
+    addVillage(world, 6, 2, RIVAL, 10)
+    world.gold[HUMAN] = TOWN_COST
+    return world
+  }
+
+  it('cost gold, and a village is upgraded only once', () => {
+    const world = startingWorld()
+    const [village, enemy] = world.villages
+    expect(upgradeToTown(world, HUMAN, enemy)).toBe(false)
+    expect(upgradeToTown(world, HUMAN, village)).toBe(true)
+    expect(world.gold[HUMAN]).toBe(0)
+    world.gold[HUMAN] = TOWN_COST
+    expect(upgradeToTown(world, HUMAN, village)).toBe(false)
+  })
+
+  it('send soldiers worth two each', () => {
+    const world = startingWorld()
+    const [village, target] = world.villages
+    upgradeToTown(world, HUMAN, village)
+    target.population = 15
+    const squad = sendSquad(world, HUMAN, village, target.cell)!
+    expect(squad.strength).toBe(2)
+    run(world, 9 / SQUAD_SPEED)
+    expect(target.owner).toBe(HUMAN) // 10 soldiers (strength 20) beat the 15+ people grown meanwhile
+  })
+
+  it('defend with soldiers worth two each, and stay towns when captured', () => {
+    const world = startingWorld()
+    const [attacker, town] = world.villages
+    town.town = true
+    attacker.population = 15
+    sendSquad(world, HUMAN, attacker, town.cell)
+    run(world, 9 / SQUAD_SPEED)
+    expect(town.owner).toBe(RIVAL) // 15 people against 10+ soldiers worth 20+
+    town.population = 3
+    attacker.population = 10
+    sendSquad(world, HUMAN, attacker, town.cell)
+    run(world, 9 / SQUAD_SPEED)
+    expect(town.owner).toBe(HUMAN)
+    expect(town.town).toBe(true)
   })
 })

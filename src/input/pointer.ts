@@ -20,7 +20,7 @@ export interface Drag {
 // Press on your village or squad, sweep over more of them, release on the target: they all set off,
 // all of each village's people, or half of them with Shift held.
 // Dragging empty ground moves the map, two fingers on a touch screen zoom it,
-// and a plain click on any other tile is passed on, e.g. to open the build menu
+// and a plain click on a tile or on your village is passed on, e.g. to open the build menu
 export class PointerInput {
   drag: Drag | null = null
   hover: Cell | null = null
@@ -111,6 +111,12 @@ export class PointerInput {
     this.pan = null
     if (!drag) {
       if (!panned && pressed && pressed === this.cellAt(event)) this.onTileClick(pressed)
+      return
+    }
+    // Released on the only village it started from: a click, e.g. to upgrade the village
+    const releasedOn = drag.target ?? this.cellAt(event)
+    if (drag.squads.length === 0 && drag.villages.length === 1 && drag.villages[0].cell === releasedOn) {
+      this.onTileClick(releasedOn)
       return
     }
     if (!drag.target) return

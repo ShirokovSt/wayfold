@@ -1,5 +1,6 @@
 import type { Difficulty } from '../ai/rival'
-import type { BuildingKind, MapSize, MapType } from '../sim/world'
+import type { Project } from '../sim/economy'
+import type { MapSize, MapType } from '../sim/world'
 import type { StepId } from '../tutorial/tutorial'
 
 export const en = {
@@ -27,12 +28,12 @@ export const en = {
   gold: 'Gold',
   tooCloseToEnemy: 'Too close to an enemy village',
 
-  buildings: { farm: 'Farm', forge: 'Forge', tower: 'Watchtower' } satisfies Record<BuildingKind, string>,
+  buildings: { farm: 'Farm', tower: 'Watchtower', town: 'Town' } satisfies Record<Project, string>,
   buildingHints: {
     farm: 'Its village grows faster.',
-    forge: 'Its village raises soldiers: each is worth two in a fight, but the village grows slower.',
     tower: 'Guards everything within two tiles: only soldiers can take that land, its villages and the tower. Every second a volley takes a tenth of an enemy squad. Cannot stand within two tiles of an enemy village.',
-  } satisfies Record<BuildingKind, string>,
+    town: 'The village becomes a town behind a stone wall. Its people are soldiers: each is worth two in attack and in defence, and only soldiers take land a tower guards. A town grows slower and stays a town when captured.',
+  } satisfies Record<Project, string>,
 
   pause: 'Pause',
   resume: 'Resume',
@@ -50,13 +51,14 @@ export const en = {
   tutorialSteps: {
     intro: 'The crown marks your capital; the rival lives across the river. Villages raise people. Take every enemy village to win. In the tutorial the rival does not attack. Zoom with the mouse wheel, a touchpad pinch or the + and − buttons; drag empty ground to move the map.',
     capture: 'Drag from your capital to the village next to it. All its people set off; if they outnumber the village, it becomes yours. Hold Shift to send only half, so the village is not left empty.',
-    land: 'Squads repaint every tile they walk across. Land brings gold, and each village grows from the land closest to it: its estate. Hover a village to see it.',
+    land: 'Squads repaint every tile they walk across. Land brings gold, and each village grows from the land closest to it: its estate. Hover a village to see it. A village grows up to 50 people; to gather more, bring in squads.',
     pause: 'Press Space or Pause. While paused you can still give orders: they start when the game resumes.',
     group: 'The far village is too big for one of yours. Drag from your capital over your second village and let go on the far one: squads leave both. Then resume the game.',
     farm: 'Click your field near a village and build a farm: the village will grow faster. Buildings cost gold.',
-    buildings: 'A forge raises soldiers: each is worth two in a fight, but the village grows slower. A watchtower guards everything within its dotted line: only soldiers can take that land, its villages and the tower.',
+    town: "Click your village and upgrade it to a town once you have 60 gold. A town's people are soldiers: each is worth two in attack and in defence. A town grows slower and stays a town when captured.",
     redirect: 'Send a squad to any tile, and while it marches, drag from it to another target: it changes course.',
-    win: "Take the rival's village. Cross the river at the ford, the sandbar. Gather people from several villages.",
+    enemy: "Take the rival's village by the river. Cross at the ford, the sandbar. Peasants are enough here.",
+    tower: "The rival's capital is guarded by a watchtower: within its dotted line only soldiers from towns can take land and villages, and its volleys thin out passing squads. Send soldiers from your town and take the capital.",
   } satisfies Record<StepId, string>,
   tutorialDone: 'Tutorial complete',
   tutorialDoneText: 'Now try a real match: there the rival will not wait.',
@@ -94,11 +96,11 @@ export const ru: Strings = {
   gold: 'Золото',
   tooCloseToEnemy: 'Слишком близко к чужой деревне',
 
-  buildings: { farm: 'Ферма', forge: 'Кузница', tower: 'Башня' },
+  buildings: { farm: 'Ферма', tower: 'Башня', town: 'Город' },
   buildingHints: {
     farm: 'Деревня растёт быстрее.',
-    forge: 'Деревня растит солдат: в бою каждый за двоих, но рост медленнее.',
     tower: 'Охраняет всё в двух клетках вокруг: эту землю, деревни и саму башню могут взять только солдаты. Каждую секунду залп уносит десятую часть вражеского отряда. Нельзя ставить ближе двух клеток к чужой деревне.',
+    town: 'Деревня становится городом за каменной стеной. Его жители — солдаты: каждый за двоих и в атаке, и в обороне, и только солдаты берут землю под охраной башни. Город растёт медленнее и остаётся городом после захвата.',
   },
 
   pause: 'Пауза',
@@ -117,13 +119,14 @@ export const ru: Strings = {
   tutorialSteps: {
     intro: 'Корона отмечает вашу столицу, соперник живёт за рекой. В деревнях растут жители. Чтобы победить, захватите все вражеские деревни. В обучении соперник не нападает. Масштаб — колесо мыши, щипок на тачпаде или кнопки + и −; чтобы сдвинуть карту, тяните за пустое место.',
     capture: 'Потяните от столицы к соседней деревне. В путь уйдут все жители; если их больше, чем в деревне, она станет вашей. Удерживайте Shift, чтобы отправить только половину и не оставлять деревню без защиты.',
-    land: 'Отряды перекрашивают каждую клетку, по которой идут. Земля приносит золото, а каждая деревня растёт от ближайшей к ней земли — своих угодий. Наведите на деревню, чтобы их увидеть.',
+    land: 'Отряды перекрашивают каждую клетку, по которой идут. Земля приносит золото, а каждая деревня растёт от ближайшей к ней земли — своих угодий. Наведите на деревню, чтобы их увидеть. Сама деревня растёт до 50 жителей; чтобы собрать больше, приводите отряды.',
     pause: 'Нажмите Пробел или «Пауза». Во время паузы можно отдавать приказы: они начнутся, когда игра продолжится.',
     group: 'Дальняя деревня слишком велика для одной вашей. Потяните от столицы через вторую деревню и отпустите на дальней: отряды выйдут из обеих. Затем продолжите игру.',
     farm: 'Нажмите на своё поле рядом с деревней и постройте ферму: деревня будет расти быстрее. Постройки стоят золота.',
-    buildings: 'Кузница растит солдат: в бою каждый за двоих, но деревня растёт медленнее. Башня охраняет всё внутри точечного контура: эту землю, деревни и саму башню могут взять только солдаты.',
+    town: 'Нажмите на свою деревню и улучшите её до города, когда накопится 60 золота. Жители города — солдаты: каждый за двоих и в атаке, и в обороне. Город растёт медленнее и остаётся городом после захвата.',
     redirect: 'Отправьте отряд к любой клетке и, пока он идёт, потяните от него к другой цели: он сменит курс.',
-    win: 'Захватите деревню соперника. Реку можно перейти по броду — песчаной косе. Соберите людей из нескольких деревень.',
+    enemy: 'Захватите деревню соперника у реки. Реку можно перейти по броду — песчаной косе. Здесь хватит и простых жителей.',
+    tower: 'Столицу соперника охраняет башня: внутри её точечного контура землю и деревни берут только солдаты из городов, а залпы прореживают проходящие отряды. Отправьте солдат из своего города и захватите столицу.',
   },
   tutorialDone: 'Обучение пройдено',
   tutorialDoneText: 'Теперь попробуйте настоящую партию: там соперник ждать не будет.',

@@ -1,8 +1,15 @@
 import { hexDistance } from '../core/hex'
 import { estateTiles } from './estates'
-import { BUILDING_COST, GOLD_PER_TILE, TOWER_RANGE } from './rules'
+import { BUILDING_COST, GOLD_PER_TILE, TOWER_RANGE, TOWN_COST } from './rules'
 import { ownTiles } from './territory'
-import { type BuildingKind, type Cell, PLAYERS, type PlayerId, type World, opponent } from './world'
+import { type BuildingKind, type Cell, PLAYERS, type PlayerId, type Village, type World, opponent } from './world'
+
+// What gold buys: a building on a field, or a village's upgrade to a town
+export type Project = BuildingKind | 'town'
+
+export function costOf(project: Project): number {
+  return project === 'town' ? TOWN_COST : BUILDING_COST[project]
+}
 
 // Every own tile brings in a little gold
 export function collectGold(world: World, dt: number): void {
@@ -31,5 +38,16 @@ export function build(world: World, player: PlayerId, cell: Cell, kind: Building
   if (!canBuild(world, player, cell, kind) || world.gold[player] < cost) return false
   world.gold[player] -= cost
   cell.building = { kind, reload: 0 }
+  return true
+}
+
+export function canUpgrade(player: PlayerId, village: Village): boolean {
+  return village.owner === player && !village.town
+}
+
+export function upgradeToTown(world: World, player: PlayerId, village: Village): boolean {
+  if (!canUpgrade(player, village) || world.gold[player] < TOWN_COST) return false
+  world.gold[player] -= TOWN_COST
+  village.town = true
   return true
 }

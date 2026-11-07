@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { Rival } from '../ai/rival'
 import { createRandom } from '../core/rng'
+import { upgradeToTown } from '../sim/economy'
 import { findPath } from '../sim/pathfind'
 import { TICK_SECONDS } from '../sim/rules'
 import { sendSquad, squadSize } from '../sim/squads'
 import { tick } from '../sim/tick'
+import { isGuarded } from '../sim/towers'
 import { HUMAN, type World } from '../sim/world'
 import { STEPS, tutorialWorld } from './tutorial'
 
@@ -43,10 +45,26 @@ describe('tutorial', () => {
     expect(world.villages[2].population).toBeGreaterThan(world.villages[0].population)
   })
 
+  it('the town step is done once a village of yours is a town', () => {
+    const world = tutorialWorld()
+    expect(step('town').done!(world, false)).toBe(false)
+    world.gold[HUMAN] = 100
+    upgradeToTown(world, HUMAN, world.villages[0])
+    expect(step('town').done!(world, false)).toBe(true)
+  })
+
+  it('the rival village by the river is open, its capital only soldiers can take', () => {
+    const world = tutorialWorld()
+    const [, , , village, capital] = world.villages
+    expect(isGuarded(world, village.cell, HUMAN)).toBe(false)
+    expect(isGuarded(world, capital.cell, HUMAN)).toBe(true)
+  })
+
   it('can be played to the end against the waiting rival', () => {
     const world = tutorialWorld()
     play(world, 10 * 60, new Rival(HUMAN, createRandom(3)))
     expect(step('group').done!(world, false)).toBe(true)
-    expect(step('win').done!(world, false)).toBe(true)
+    expect(step('enemy').done!(world, false)).toBe(true)
+    expect(step('tower').done!(world, false)).toBe(true)
   })
 })

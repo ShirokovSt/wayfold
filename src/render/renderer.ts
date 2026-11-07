@@ -101,14 +101,14 @@ export class Renderer {
     for (const cell of this.world.map.cells) {
       if (!cell.building) continue
       const { x, y } = tileCenter(this.layout, cell)
-      drawBuilding(ctx, cell.building.kind, x, y, size, ownerTone(cell.owner), time)
+      drawBuilding(ctx, cell.building.kind, x, y, size, ownerTone(cell.owner))
     }
     if (view.showRoutes) this.drawRoutes()
     if (view.drag) this.drawDrag(view.drag)
 
     for (const village of this.world.villages) {
       const { x, y } = tileCenter(this.layout, village.cell)
-      drawVillage(ctx, x, y, size, ownerTone(village.owner), time)
+      drawVillage(ctx, x, y, size, ownerTone(village.owner), time, village.town)
       if (village.capital) drawCrown(ctx, x - size * 0.05, y - size * 0.5, size, time)
     }
     const squads = [...this.world.squads].sort((a, b) => a.y - b.y)

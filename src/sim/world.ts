@@ -17,8 +17,8 @@ export const MAP_TYPES: readonly MapType[] = ['continent', 'lakes', 'peninsulas'
 export type MapSize = 'small' | 'medium' | 'large'
 export const MAP_SIZES: readonly MapSize[] = ['small', 'medium', 'large']
 
-export type BuildingKind = 'farm' | 'forge' | 'tower'
-export const BUILDING_KINDS: readonly BuildingKind[] = ['farm', 'forge', 'tower']
+export type BuildingKind = 'farm' | 'tower'
+export const BUILDING_KINDS: readonly BuildingKind[] = ['farm', 'tower']
 
 // A building belongs to whoever owns its tile, so a raid that repaints the tile takes it over
 export interface Building {
@@ -41,6 +41,7 @@ export interface Village {
   owner: Owner
   population: number // fractional: grows a little every tick
   capital: boolean // each player has one capital, marked with a crown
+  town: boolean // upgraded: its people are soldiers, attacking and defending; a captured town stays one
   capturedAt: number // match time of the last capture; the longer-held village wins a tied tile
 }
 
@@ -48,7 +49,7 @@ export interface Squad {
   readonly id: number
   readonly owner: PlayerId
   count: number
-  strength: number // what one member is worth in a fight: soldiers from a forge village count double
+  strength: number // what one member is worth in a fight: soldiers from a town count double
   path: Cell[] // from the start cell to the destination
   step: number // index in path of the cell the squad is leaving
   progress: number // 0..1 on the way from path[step] to path[step + 1]

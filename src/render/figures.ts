@@ -1,15 +1,74 @@
 import { ellipse } from './board'
 import type { Point } from '../core/hex'
 import type { BuildingKind } from '../sim/world'
-import { FARM, FORGE_GLOW, GOLD, SHADOW, SMOKE, STEEL, STONE, type Tone, WOOD } from './palette'
+import { FARM, GOLD, ROCK, SHADOW, STEEL, STONE, type Tone, WOOD } from './palette'
 
-// Village pieces: three little houses with roofs in the owner's color and a flag
-export function drawVillage(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number): void {
-  ellipse(ctx, x, y + size * 0.1, size * 0.44, size * 0.17, SHADOW)
+// Village pieces: three little houses with roofs in the owner's color and a flag;
+// a town stands inside a stone wall, with a keep at the back, clear of the capital's crown
+export function drawVillage(
+  ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number, town = false,
+): void {
+  ellipse(ctx, x, y + size * 0.1, size * (town ? 0.6 : 0.44), size * (town ? 0.26 : 0.17), SHADOW)
+  if (town) drawWall(ctx, x, y, size)
   drawFlag(ctx, x + size * 0.4, y - size * 0.02, size, tone, time)
+  if (town) drawKeep(ctx, x - size * 0.33, y - size * 0.02, size, tone)
   drawHouse(ctx, x - size * 0.25, y - size * 0.1, size * 0.33, tone)
   drawHouse(ctx, x + size * 0.17, y - size * 0.17, size * 0.3, tone)
   drawHouse(ctx, x - size * 0.02, y + size * 0.18, size * 0.4, tone)
+}
+
+// A low round wall: its front face, the top and battlements along the front edge
+function drawWall(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  const cy = y + size * 0.05
+  const rx = size * 0.56
+  const ry = size * 0.25
+  const h = size * 0.1
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = size * 0.025
+  ctx.strokeStyle = STONE.dark
+  ctx.beginPath()
+  ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI)
+  ctx.lineTo(x - rx, cy + h)
+  ctx.ellipse(x, cy + h, rx, ry, 0, Math.PI, 0, true)
+  ctx.closePath()
+  ctx.fillStyle = ROCK.dark
+  ctx.fill()
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2)
+  ctx.fillStyle = STONE.main
+  ctx.fill()
+  ctx.stroke()
+  for (let i = 0; i <= 6; i++) {
+    const angle = Math.PI * (0.08 + (0.84 * i) / 6)
+    const bx = x + rx * Math.cos(angle)
+    const by = cy + ry * Math.sin(angle)
+    ctx.fillRect(bx - size * 0.04, by - size * 0.07, size * 0.08, size * 0.07)
+    ctx.strokeRect(bx - size * 0.04, by - size * 0.07, size * 0.08, size * 0.07)
+  }
+}
+
+// A tall stone tower with a window and a pointed roof in the owner's color
+function drawKeep(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone): void {
+  const w = size * 0.2
+  const top = y - size * 0.52
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = size * 0.025
+  ctx.fillStyle = STONE.main
+  ctx.strokeStyle = STONE.dark
+  ctx.fillRect(x - w / 2, top, w, y - top)
+  ctx.strokeRect(x - w / 2, top, w, y - top)
+  ctx.fillStyle = WOOD.door
+  ctx.fillRect(x - size * 0.03, top + size * 0.08, size * 0.06, size * 0.09)
+  ctx.beginPath()
+  ctx.moveTo(x - w * 0.7, top)
+  ctx.lineTo(x, top - size * 0.24)
+  ctx.lineTo(x + w * 0.7, top)
+  ctx.closePath()
+  ctx.fillStyle = tone.main
+  ctx.strokeStyle = tone.dark
+  ctx.fill()
+  ctx.stroke()
 }
 
 function drawHouse(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, tone: Tone): void {
@@ -151,10 +210,9 @@ export function drawPerson(
 
 // Buildings stand on their tile like game pieces; roofs and pennants show the owner
 export function drawBuilding(
-  ctx: CanvasRenderingContext2D, kind: BuildingKind, x: number, y: number, size: number, tone: Tone, time: number,
+  ctx: CanvasRenderingContext2D, kind: BuildingKind, x: number, y: number, size: number, tone: Tone,
 ): void {
   if (kind === 'farm') drawFarm(ctx, x, y, size, tone)
-  else if (kind === 'forge') drawForge(ctx, x, y, size, tone, time)
   else drawTower(ctx, x, y, size, tone)
 }
 
@@ -190,46 +248,6 @@ function drawFarm(ctx: CanvasRenderingContext2D, x: number, y: number, size: num
   ctx.fill()
   ctx.stroke()
   drawPennant(ctx, hx, hy - size * 0.13, size * 0.7, tone)
-}
-
-// A stone smithy with a glowing door and smoke from the chimney
-function drawForge(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number): void {
-  const w = size * 0.5
-  const h = size * 0.3
-  const wallTop = y - h + size * 0.1
-  ellipse(ctx, x, y + size * 0.12, size * 0.4, size * 0.13, SHADOW)
-  ctx.lineJoin = 'round'
-  ctx.lineWidth = size * 0.03
-  ctx.strokeStyle = STONE.dark
-  ctx.fillStyle = STONE.main
-  ctx.fillRect(x - w / 2, wallTop, w, h)
-  ctx.strokeRect(x - w / 2, wallTop, w, h)
-  ctx.fillStyle = FORGE_GLOW
-  ctx.fillRect(x - size * 0.07, y - size * 0.06, size * 0.14, size * 0.16)
-
-  // Chimney behind the roof, then the roof
-  ctx.fillStyle = STONE.dark
-  ctx.fillRect(x + w * 0.18, wallTop - size * 0.3, size * 0.09, size * 0.25)
-  ctx.beginPath()
-  ctx.moveTo(x - w * 0.62, wallTop + size * 0.01)
-  ctx.lineTo(x, wallTop - size * 0.22)
-  ctx.lineTo(x + w * 0.62, wallTop + size * 0.01)
-  ctx.closePath()
-  ctx.fillStyle = tone.main
-  ctx.strokeStyle = tone.dark
-  ctx.fill()
-  ctx.stroke()
-
-  // Smoke puffs drift up and fade
-  for (let i = 0; i < 3; i++) {
-    const t = (time * 0.6 + i / 3) % 1
-    ctx.globalAlpha = 0.5 * (1 - t)
-    ctx.beginPath()
-    ctx.arc(x + w * 0.22 + t * size * 0.12, wallTop - size * (0.34 + t * 0.4), size * (0.05 + t * 0.07), 0, Math.PI * 2)
-    ctx.fillStyle = SMOKE
-    ctx.fill()
-  }
-  ctx.globalAlpha = 1
 }
 
 // A wooden lookout on four legs

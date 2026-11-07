@@ -1,12 +1,12 @@
 import { hexDistance } from '../core/hex'
 import type { Random } from '../core/rng'
-import { build, canBuild } from '../sim/economy'
+import { type Project, build, canBuild, costOf, upgradeToTown } from '../sim/economy'
 import { estateBuildings, estateTiles } from '../sim/estates'
 import { findPath, pathDuration } from '../sim/pathfind'
-import { BUILDING_COST, POPULATION_CAP, SOLDIER_STRENGTH } from '../sim/rules'
+import { POPULATION_CAP } from '../sim/rules'
 import { sendSquad, squadTarget } from '../sim/squads'
 import { isGuarded } from '../sim/towers'
-import { growthRate, hasForge } from '../sim/villages'
+import { growthRate, strengthOf } from '../sim/villages'
 import { type BuildingKind, type Cell, type PlayerId, type Village, type World, opponent } from '../sim/world'
 
 export type Difficulty = 'easy' | 'normal' | 'hard'
@@ -19,13 +19,13 @@ interface Profile {
   margin: number // extra people sent on top of what the target should have on arrival
   maxGroup: number // villages that may attack one target together
   defendChance: number // how likely it notices that a village of its own is under attack
-  builds: BuildingKind[]
+  builds: Project[]
 }
 
 const PROFILES: Record<Difficulty, Profile> = {
   easy: { firstMove: 20, think: 6, margin: 6, maxGroup: 1, defendChance: 0.5, builds: ['farm'] },
-  normal: { firstMove: 10, think: 3.5, margin: 4, maxGroup: 3, defendChance: 1, builds: ['farm', 'forge', 'tower'] },
-  hard: { firstMove: 6, think: 2, margin: 4, maxGroup: 4, defendChance: 1, builds: ['farm', 'forge', 'tower'] },
+  normal: { firstMove: 10, think: 3.5, margin: 4, maxGroup: 3, defendChance: 1, builds: ['farm', 'town', 'tower'] },
+  hard: { firstMove: 6, think: 2, margin: 4, maxGroup: 4, defendChance: 1, builds: ['farm', 'town', 'tower'] },
 }
 
 // A simple opponent: every few seconds it makes one move — defend, capture or raid — and spends its gold
@@ -52,29 +52,33 @@ export class Rival {
     this.develop(world)
   }
 
-  // A farm at the capital first, then a forge there once it has a few villages, a tower at the front,
+  // A farm at the capital first, then the capital becomes a town once it has a few villages, a tower at the front,
   // farms for the other villages and then second farms; it saves up for the first plan with a free spot
   private develop(world: World): void {
     const villages = this.villages(world)
     const capital = villages.find((v) => v.capital)
     const front = this.frontVillage(world)
     const farms = (village: Village) => estateBuildings(world, village, 'farm').length
-    const plans: [Village, BuildingKind][] = []
+    const plans: [Village, Project][] = []
     if (capital && farms(capital) === 0) plans.push([capital, 'farm'])
-    if (capital && villages.length >= 3 && !hasForge(world, capital)) plans.push([capital, 'forge'])
+    if (capital && villages.length >= 3 && !capital.town) plans.push([capital, 'town'])
     if (front && estateBuildings(world, front, 'tower').length === 0) plans.push([front, 'tower'])
     for (const village of villages) if (farms(village) === 0) plans.push([village, 'farm'])
     for (const village of villages) if (farms(village) === 1) plans.push([village, 'farm'])
 
     for (const [village, kind] of plans.filter(([, kind]) => this.profile.builds.includes(kind))) {
+      if (kind === 'town') {
+        upgradeToTown(world, this.player, village)
+        return
+      }
       const spot = this.buildSpot(world, village, kind)
       if (!spot) continue
-      if (world.gold[this.player] >= BUILDING_COST[kind]) build(world, this.player, spot, kind)
+      if (world.gold[this.player] >= costOf(kind)) build(world, this.player, spot, kind)
       return
     }
   }
 
-  // Towers go toward the enemy, farms and forges close to home
+  // Towers go toward the enemy, farms close to home
   private buildSpot(world: World, village: Village, kind: BuildingKind): Cell | null {
     const spots = estateTiles(world, village).filter((cell) => canBuild(world, this.player, cell, kind))
     const enemy = this.enemyVillages(world)
@@ -119,17 +123,17 @@ export class Rival {
       if (to.owner === this.player) continue
       const guarded = isGuarded(world, to.cell, this.player)
       const senders = this.villages(world)
-        .filter((from) => !guarded || hasForge(world, from))
+        .filter((from) => !guarded || from.town)
         .map((from) => ({ from, path: findPath(world.map, from.cell, to.cell) }))
         .filter((s) => s.path !== null)
-        .map(({ from, path }) => ({ from, time: pathDuration(path!), strength: this.strength(world, from) }))
+        .map(({ from, path }) => ({ from, time: pathDuration(path!), strength: this.strength(from) }))
         .sort((a, b) => a.time - b.time)
         .slice(0, this.profile.maxGroup)
 
       let strength = 0
       for (const [i, sender] of senders.entries()) {
         strength += sender.strength
-        const needed = to.population + growthRate(world, to) * sender.time + this.profile.margin -
+        const needed = (to.population + growthRate(world, to) * sender.time) * strengthOf(to) + this.profile.margin -
           incoming(world, to, (owner) => owner === this.player)
         const score = sender.time + needed * 0.3 + i * 3 // a lone attack is simpler, so it is preferred
         if (strength >= needed && (!best || score < best.score)) {
@@ -144,8 +148,8 @@ export class Rival {
   }
 
   // What the village's people are worth in a fight if they all set off now
-  private strength(world: World, village: Village): number {
-    return Math.floor(village.population) * (hasForge(world, village) ? SOLDIER_STRENGTH : 1)
+  private strength(village: Village): number {
+    return Math.floor(village.population) * strengthOf(village)
   }
 
   // A full village with nothing to take marches over the nearest enemy land and back:
@@ -153,7 +157,7 @@ export class Rival {
   private raid(world: World): boolean {
     const full = this.villages(world).find((village) => village.population >= POPULATION_CAP * 0.8)
     if (!full) return false
-    const soldiers = hasForge(world, full)
+    const soldiers = full.town
     const enemyLand = world.map.cells.filter((cell) => cell.owner !== null && cell.owner !== this.player && !cell.village)
     const towers = enemyLand.filter((cell) => cell.building?.kind === 'tower')
     const open = enemyLand.filter((cell) => !isGuarded(world, cell, this.player))

@@ -1,6 +1,6 @@
 import { hexDistance } from '../core/hex'
 import { estateBuildings, estateTiles } from './estates'
-import { BASE_GROWTH, FARM_GROWTH, FORGE_GROWTH, GROWTH_PER_TILE, POPULATION_CAP } from './rules'
+import { BASE_GROWTH, FARM_GROWTH, GROWTH_PER_TILE, POPULATION_CAP, SOLDIER_STRENGTH, TOWN_GROWTH } from './rules'
 import type { Cell, PlayerId, Village, World } from './world'
 
 // People per second, from the estate and its farms; neutral villages only keep their garrison
@@ -8,12 +8,12 @@ export function growthRate(world: World, village: Village): number {
   if (village.owner === null) return 0
   const farms = estateBuildings(world, village, 'farm').length
   const rate = BASE_GROWTH + GROWTH_PER_TILE * estateTiles(world, village).length + FARM_GROWTH * farms
-  return hasForge(world, village) ? rate * FORGE_GROWTH : rate
+  return village.town ? rate * TOWN_GROWTH : rate
 }
 
-// A forge in the estate turns the village's people into soldiers
-export function hasForge(world: World, village: Village): boolean {
-  return village.owner !== null && estateBuildings(world, village, 'forge').length > 0
+// What one of the village's people is worth in a fight: a town's people are soldiers
+export function strengthOf(village: Village): number {
+  return village.town ? SOLDIER_STRENGTH : 1
 }
 
 export function growVillages(world: World, dt: number): void {

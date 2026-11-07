@@ -1,9 +1,9 @@
 import { hexDistance, hexToPoint } from '../core/hex'
 import { findPath } from './pathfind'
-import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, MOVE_COST, SOLDIER_STRENGTH, SQUAD_SPEED } from './rules'
+import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, MOVE_COST, SQUAD_SPEED } from './rules'
 import { claimAround, paint } from './territory'
 import { canTake } from './towers'
-import { ensureCapital, hasForge } from './villages'
+import { ensureCapital, strengthOf } from './villages'
 import type { Cell, PlayerId, Squad, Village, World } from './world'
 
 // How many of the village's people set off: all of them, or half so the village is not left empty
@@ -22,7 +22,7 @@ export function sendSquad(world: World, player: PlayerId, from: Village, to: Cel
   if (count < 1 || !path || path.length < 2) return null
 
   from.population -= count
-  const strength = hasForge(world, from) ? SOLDIER_STRENGTH : 1
+  const strength = strengthOf(from)
   const { x, y } = hexToPoint(from.cell.hex, 1)
   const squad: Squad = {
     id: world.nextId++, owner: player, count, strength, path, step: 0, progress: 0,
@@ -120,22 +120,22 @@ function enterVillage(world: World, squad: Squad, village: Village): void {
     village.population += squad.count
     return
   }
+  // A town's people defend as soldiers too
+  const defence = village.population * strengthOf(village)
+  const attack = power(squad)
   // Peasants can beat the garrison of a guarded village, but only soldiers can move in
-  if (!canTake(world, squad, village.cell)) {
-    village.population = Math.max(0, village.population - power(squad))
+  if (attack <= defence || !canTake(world, squad, village.cell)) {
+    village.population = Math.max(0, defence - attack) / strengthOf(village)
     return
   }
-  village.population -= power(squad)
-  if (village.population < 0) {
-    const loser = village.owner
-    village.owner = squad.owner
-    village.population = -village.population / squad.strength // the survivors move in
-    village.capturedAt = world.time
-    village.capital = false // a captured capital becomes an ordinary village
-    claimAround(world.map, village, CAPTURE_LAND_RADIUS, (cell) => canTake(world, squad, cell))
-    if (loser !== null) ensureCapital(world, loser, village.cell)
-    ensureCapital(world, squad.owner, village.cell)
-  }
+  const loser = village.owner
+  village.owner = squad.owner
+  village.population = (attack - defence) / squad.strength // the survivors move in
+  village.capturedAt = world.time
+  village.capital = false // a captured capital becomes an ordinary village
+  claimAround(world.map, village, CAPTURE_LAND_RADIUS, (cell) => canTake(world, squad, cell))
+  if (loser !== null) ensureCapital(world, loser, village.cell)
+  ensureCapital(world, squad.owner, village.cell)
 }
 
 function nearestVillage(world: World, cell: Cell, owner: PlayerId): Village | null {
