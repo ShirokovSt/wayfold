@@ -2,12 +2,13 @@ import { readStored, store } from '../storage'
 import type { SoundEvent } from './events'
 
 const SOUND_KEY = 'wayfold.sound'
-const VOLUME = 0.6
+const VOLUME_KEY = 'wayfold.volume'
+const LOUDEST = 0.8 // the output at full volume, so a few sounds at once do not crackle
 const REPEAT_GAP = 0.1 // seconds: the same sound twice in a row would only be louder
 
 interface Audio {
   context: AudioContext
-  output: AudioNode
+  output: GainNode // the volume of everything
   noise: AudioBuffer
 }
 
@@ -22,16 +23,36 @@ interface Tone {
 // Every sound is made here from plain waves and noise, the way the board is drawn in code
 class Sounds {
   muted = readStored(SOUND_KEY) === 'off'
+  volume = savedVolume() // 0..1
   private audio: Audio | null = null
   private lastPlayed = new Map<SoundEvent, number>()
 
+  // Silent either way: switched off, or the volume turned all the way down
+  get silent(): boolean {
+    return this.muted || this.volume === 0
+  }
+
+  // Switched on with the volume at zero, it comes back at half, or nothing would change
   toggle(): void {
-    this.muted = !this.muted
-    store(SOUND_KEY, this.muted ? 'off' : 'on')
+    this.setMuted(!this.muted)
+    if (!this.muted && this.volume === 0) this.setVolume(0.5)
+  }
+
+  // Moving the volume also switches the sound back on
+  setVolume(volume: number): void {
+    this.volume = volume
+    store(VOLUME_KEY, String(volume))
+    this.setMuted(false)
+    if (this.audio) this.audio.output.gain.value = volume * LOUDEST
+  }
+
+  private setMuted(muted: boolean): void {
+    this.muted = muted
+    store(SOUND_KEY, muted ? 'off' : 'on')
   }
 
   play(event: SoundEvent): void {
-    if (this.muted) return
+    if (this.silent) return
     const audio = this.open()
     const time = audio.context.currentTime
     if (time - (this.lastPlayed.get(event) ?? -1) < REPEAT_GAP) return
@@ -39,12 +60,21 @@ class Sounds {
     RECIPES[event](audio, time)
   }
 
+  // A soft ping of its own, to hear the volume while setting it
+  preview(): void {
+    if (this.silent) return
+    const audio = this.open()
+    const time = audio.context.currentTime
+    tone(audio, time, { from: NOTE.G5, length: 0.35, volume: 0.25 })
+    tone(audio, time, { wave: 'triangle', from: NOTE.G5 * 2, length: 0.15, volume: 0.05 })
+  }
+
   // Browsers allow sound only after the player has clicked the page; by the first event they have
   private open(): Audio {
     if (!this.audio) {
       const context = new AudioContext()
       const output = context.createGain()
-      output.gain.value = VOLUME
+      output.gain.value = this.volume * LOUDEST
       output.connect(context.destination)
       this.audio = { context, output, noise: whiteNoise(context) }
     }
@@ -54,6 +84,11 @@ class Sounds {
 }
 
 export const sounds = new Sounds()
+
+function savedVolume(): number {
+  const volume = Number(readStored(VOLUME_KEY) ?? 0.75)
+  return volume >= 0 && volume <= 1 ? volume : 0.75
+}
 
 const NOTE = { C4: 261.6, Eb4: 311.1, G4: 392, C5: 523.3, E5: 659.3, G5: 784, C6: 1046.5 }
 

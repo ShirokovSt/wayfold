@@ -196,6 +196,23 @@ button.primary:hover {
   height: 14px;
 }
 
+.sound {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+}
+
+.volume {
+  width: 80px;
+  accent-color: var(--paper);
+  cursor: pointer;
+}
+
+.volume.off {
+  opacity: 0.4;
+}
+
 .speed button:first-child {
   border-radius: 8px 0 0 8px;
 }

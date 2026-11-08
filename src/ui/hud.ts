@@ -44,6 +44,7 @@ export class Hud {
   private season = withHint(this.seasonButton, this.seasonName, this.seasonHint)
   private pauseButton = button('', () => this.actions.togglePause(), 'icon-button')
   private soundButton = button('', () => sounds.toggle(), 'icon-button')
+  private volume = volumeSlider()
   private speedButtons: HTMLButtonElement[] = []
 
   constructor(
@@ -71,7 +72,10 @@ export class Hud {
     // On pause the button shows what it will do: play
     const resumes = this.game.paused && this.game.started
     setIcon(this.pauseButton, resumes ? PLAY_ICON : PAUSE_ICON, resumes ? t().resume : t().pause)
-    setIcon(this.soundButton, sounds.muted ? MUTED_ICON : SOUND_ICON, sounds.muted ? t().soundOn : t().soundOff)
+    setIcon(this.soundButton, sounds.silent ? MUTED_ICON : SOUND_ICON, sounds.silent ? t().soundOn : t().soundOff)
+    const volume = String(Math.round(sounds.volume * 100))
+    if (this.volume.value !== volume) this.volume.value = volume
+    this.volume.classList.toggle('off', sounds.silent)
     SPEEDS.forEach((speed, i) => this.speedButtons[i].classList.toggle('active', speed === this.game.speed))
   }
 
@@ -91,11 +95,13 @@ export class Hud {
     this.speedButtons = SPEEDS.map((speed) => button(`×${speed}`, () => this.actions.setSpeed(speed)))
     const speeds = element('div', 'speed', ...this.speedButtons)
     speeds.title = t().speed
+    this.volume.title = t().volume
+    this.volume.ariaLabel = t().volume
     this.root.replaceChildren(
       menu,
       ...stats,
       element('div', 'when', this.season, this.clock),
-      element('div', 'group', speeds, this.soundButton, this.pauseButton),
+      element('div', 'group', speeds, this.pauseButton, element('div', 'sound', this.soundButton, this.volume)),
     )
     this.update()
   }
@@ -118,6 +124,20 @@ function countPeople(world: World, player: PlayerId): number {
   for (const village of world.villages) if (village.owner === player) count += Math.floor(village.population)
   for (const squad of world.squads) if (squad.owner === player) count += squad.count
   return count
+}
+
+// On release it pings, to hear the new volume, and gives the arrow keys back to the map
+function volumeSlider(): HTMLInputElement {
+  const slider = element('input', 'volume')
+  slider.type = 'range'
+  slider.min = '0'
+  slider.max = '100'
+  slider.addEventListener('input', () => sounds.setVolume(Number(slider.value) / 100))
+  slider.addEventListener('change', () => {
+    slider.blur()
+    sounds.preview()
+  })
+  return slider
 }
 
 // The label tells what a click will do; the picture changes along with it
