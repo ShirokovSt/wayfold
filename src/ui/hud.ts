@@ -4,9 +4,20 @@ import { onLanguageChange, t } from '../i18n'
 import { landShare } from '../sim/territory'
 import { HUMAN, PLAYERS, type PlayerId, type Season, type World } from '../sim/world'
 import { button, element } from './dom'
+import { withHint } from './hint'
 
 const SPEEDS = [0.5, 1, 2]
 const SEASON_ICONS: Record<Season, string> = { summer: '☀', autumn: '🍂', winter: '❄', spring: '🌱' }
+
+type Stat = 'villages' | 'people' | 'land' | 'gold'
+const STATS: Stat[] = ['villages', 'people', 'land', 'gold']
+// Little pictures instead of words: a house, a person, a tile and a coin
+const ICONS: Record<Stat, string> = {
+  villages: '<path d="M2 8 8 2.5 14 8v6H2z"/>',
+  people: '<circle cx="8" cy="4.6" r="2.7"/><path d="M3 14c0-4.4 2.2-6 5-6s5 1.6 5 6z"/>',
+  land: '<path d="M8 1.5l5.6 3.25v6.5L8 14.5l-5.6-3.25v-6.5z"/>',
+  gold: '<circle cx="8" cy="8" r="5.6" fill="#f2c14e" stroke="#8a6514" stroke-width="1.5"/>',
+}
 
 interface Actions {
   togglePause(): void
@@ -16,13 +27,13 @@ interface Actions {
 
 // The top bar holds only the match: the menu button, both players' numbers, the season, the clock, speed and pause
 export class Hud {
-  private values: { player: PlayerId; villages: HTMLElement; people: HTMLElement; land: HTMLElement; gold: HTMLElement }[] = []
+  private values: { player: PlayerId; values: Record<Stat, HTMLElement> }[] = []
   private clock = element('span', 'clock')
   // The season's icon; hovering or clicking it shows the season's rules
-  private seasonButton = button('', () => this.season.classList.toggle('open'), 'season-button')
+  private seasonButton = button('', () => {}, 'season-button')
   private seasonName = element('b', '')
   private seasonHint = element('p', '')
-  private season = element('div', 'season', this.seasonButton, element('div', 'season-info', this.seasonName, this.seasonHint))
+  private season = withHint(this.seasonButton, this.seasonName, this.seasonHint)
   private pauseButton = button('', () => this.actions.togglePause())
   private speedButtons: HTMLButtonElement[] = []
 
@@ -33,18 +44,15 @@ export class Hud {
   ) {
     this.build()
     onLanguageChange(() => this.build())
-    document.addEventListener('pointerdown', (event) => {
-      if (!this.season.contains(event.target as Node)) this.season.classList.remove('open')
-    })
   }
 
   update(): void {
     const world = this.game.world
-    for (const { player, villages, people, land, gold } of this.values) {
-      setText(gold, String(Math.floor(world.gold[player])))
-      setText(villages, String(world.villages.filter((v) => v.owner === player).length))
-      setText(people, String(countPeople(world, player)))
-      setText(land, `${Math.round(landShare(world, player) * 100)}%`)
+    for (const { player, values } of this.values) {
+      setText(values.gold, String(Math.floor(world.gold[player])))
+      setText(values.villages, String(world.villages.filter((v) => v.owner === player).length))
+      setText(values.people, String(countPeople(world, player)))
+      setText(values.land, `${Math.round(landShare(world, player) * 100)}%`)
     }
     const season = world.map.season
     setText(this.seasonButton, SEASON_ICONS[season])
@@ -64,18 +72,11 @@ export class Hud {
     menu.title = `${t().menu} (Esc)`
     this.values = []
     const stats = PLAYERS.map((player) => {
-      const value = () => element('b', '')
-      const row = { player, villages: value(), people: value(), land: value(), gold: value() }
-      this.values.push(row)
-      return element(
-        'div',
-        `stats ${player === HUMAN ? 'you' : 'rival'}`,
-        element('span', 'name', player === HUMAN ? t().you : t().rival),
-        element('span', 'label', t().villages), row.villages,
-        element('span', 'label', t().people), row.people,
-        element('span', 'label', t().land), row.land,
-        element('span', 'label', t().gold), row.gold,
-      )
+      const values = { villages: element('b', ''), people: element('b', ''), land: element('b', ''), gold: element('b', '') }
+      this.values.push({ player, values })
+      const items = STATS.map((stat) =>
+        withHint(element('span', 'stat', icon(stat), values[stat]), element('b', '', t()[stat]), element('p', '', t().statHints[stat])))
+      return element('div', `stats ${player === HUMAN ? 'you' : 'rival'}`, element('span', 'name', player === HUMAN ? t().you : t().rival), ...items)
     })
     this.speedButtons = SPEEDS.map((speed) => button(`×${speed}`, () => this.actions.setSpeed(speed)))
     const speeds = element('div', 'speed', ...this.speedButtons)
@@ -88,6 +89,12 @@ export class Hud {
     )
     this.update()
   }
+}
+
+function icon(stat: Stat): HTMLElement {
+  const node = element('span', 'stat-icon')
+  node.innerHTML = `<svg viewBox="0 0 16 16" fill="currentColor">${ICONS[stat]}</svg>`
+  return node
 }
 
 export function formatTime(seconds: number): string {

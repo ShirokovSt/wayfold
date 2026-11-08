@@ -75,12 +75,24 @@ body {
   margin-right: 4px;
 }
 
-.stats .label {
-  color: var(--muted);
-  font-size: 13px;
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: default;
 }
 
-.stats b {
+.stat-icon {
+  display: inline-flex;
+  color: var(--muted);
+}
+
+.stat-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.stat > b {
   min-width: 2ch;
   margin-right: 6px;
   font-variant-numeric: tabular-nums;
@@ -91,7 +103,7 @@ body {
   align-items: center;
 }
 
-.season {
+.hinted {
   position: relative;
   z-index: 10;
 }
@@ -104,12 +116,13 @@ body {
   border-color: transparent;
 }
 
-.season-info {
+.hint {
   display: none;
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  width: 260px;
+  width: max-content;
+  max-width: 260px;
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--paper);
@@ -119,12 +132,12 @@ body {
   box-shadow: 0 4px 0 #c9b791, 0 10px 24px rgba(0, 0, 0, 0.4);
 }
 
-.season-info p {
+.hint p {
   margin: 4px 0 0;
 }
 
-.season:hover .season-info,
-.season.open .season-info {
+.hinted:hover .hint,
+.hinted.open .hint {
   display: block;
 }
 
@@ -332,7 +345,7 @@ button.primary:hover {
 }
 
 .card {
-  max-width: 560px;
+  max-width: 640px;
   max-height: calc(100vh - 32px);
   overflow-y: auto;
   margin: 16px;
@@ -430,22 +443,60 @@ button.primary:hover {
   color: #7d6a52;
 }
 
-.choice {
-  display: flex;
+/* One grid for all rows, so every row of options starts at the same place */
+.choices {
+  display: grid;
+  grid-template-columns: max-content 1fr;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 10px 14px;
+  width: min(560px, calc(100vw - 112px)); /* wide enough for every map type on one line */
 }
 
-.season-hint {
-  margin: -4px 0 12px 74px;
-  color: #7d6a52;
+.choice {
+  display: contents;
+}
+
+.card .choice .help {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 6px;
+  padding: 0;
+  color: var(--ink);
+  background: transparent;
+  border-color: #c9b791;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.card .choice .help.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.season-rules {
+  grid-column: 1 / -1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #efe3c8;
   font-size: 13px;
-  line-height: 1.35;
+  line-height: 1.4;
+}
+
+.season-rules p {
+  margin: 0;
+}
+
+.season-rules p + p {
+  margin-top: 5px;
 }
 
 .choice .label {
-  min-width: 64px;
+  display: flex;
+  align-items: center;
   color: #7d6a52;
 }
 

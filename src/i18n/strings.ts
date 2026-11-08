@@ -15,14 +15,14 @@ export const en = {
   mapSize: 'Size',
   mapSizes: { small: 'Small', medium: 'Medium', large: 'Large' } satisfies Record<MapSize, string>,
   season: 'Season',
+  seasonRules: 'What each season changes',
   seasons: { random: 'Random', summer: 'Summer', autumn: 'Autumn', winter: 'Winter', spring: 'Spring' } satisfies Record<Season | 'random', string>,
   seasonHints: {
-    random: 'One of the four seasons, each with its own rules.',
     summer: 'The usual rules.',
     autumn: 'Harvest: every farm also brings gold. Mud: squads cross fields slower.',
     winter: 'Rivers and lakes freeze and can be crossed; the sea does not. Snow slows squads everywhere, villages grow slower.',
     spring: 'Villages grow faster. Floods: fords take twice as long to cross.',
-  } satisfies Record<Season | 'random', string>,
+  } satisfies Record<Season, string>,
   difficulty: 'Rival',
   difficulties: { easy: 'Easy', normal: 'Normal', hard: 'Hard' } satisfies Record<Difficulty, string>,
   zoomIn: 'Zoom in (+)',
@@ -35,6 +35,12 @@ export const en = {
   people: 'People',
   land: 'Land',
   gold: 'Gold',
+  statHints: {
+    villages: 'Each one raises people.',
+    people: 'In villages and on the march.',
+    land: 'Share of all land on the map. Every tile brings gold.',
+    gold: 'Spent on buildings and towns.',
+  },
   tooCloseToEnemy: 'Too close to an enemy village',
 
   buildings: { farm: 'Farm', tower: 'Watchtower', town: 'Town' } satisfies Record<Project, string>,
@@ -92,9 +98,9 @@ export const ru: Strings = {
   mapSize: 'Размер',
   mapSizes: { small: 'Малая', medium: 'Средняя', large: 'Большая' },
   season: 'Время года',
+  seasonRules: 'Чем отличаются времена года',
   seasons: { random: 'Случайное', summer: 'Лето', autumn: 'Осень', winter: 'Зима', spring: 'Весна' },
   seasonHints: {
-    random: 'Одно из четырёх времён года, у каждого свои правила.',
     summer: 'Обычные правила.',
     autumn: 'Урожай: каждая ферма приносит ещё и золото. Распутица: по полям отряды идут медленнее.',
     winter: 'Реки и озёра замерзают, по ним можно пройти, а море — нет. По снегу отряды везде идут медленнее, деревни растут медленнее.',
@@ -112,6 +118,12 @@ export const ru: Strings = {
   people: 'Жители',
   land: 'Земля',
   gold: 'Золото',
+  statHints: {
+    villages: 'В каждой растут жители.',
+    people: 'В деревнях и в походе.',
+    land: 'Доля всей суши на карте. Каждая клетка приносит золото.',
+    gold: 'Тратится на постройки и города.',
+  },
   tooCloseToEnemy: 'Слишком близко к чужой деревне',
 
   buildings: { farm: 'Ферма', tower: 'Башня', town: 'Город' },

@@ -23,6 +23,7 @@ export interface MenuActions {
 // Cards over the board: the menu, the new map card and the end of the match
 export class Screens {
   private content: (() => HTMLElement) | null = null
+  private seasonHelpOpen = false
   private onEscape: (() => void) | null = null
 
   constructor(private readonly root: HTMLElement) {
@@ -58,7 +59,7 @@ export class Screens {
         'div',
         'card',
         element('h2', '', t().newMap),
-        ...this.choices(choice),
+        this.choices(choice),
         element('div', 'actions', button(t().play, onPlay, 'primary'), button(t().back, onBack)),
       ),
     )
@@ -108,23 +109,33 @@ export class Screens {
   }
 
   // Map type, size, season and difficulty rows; a click changes the setting and redraws the card
-  private choices(choice: MatchChoice): HTMLElement[] {
+  private choices(choice: MatchChoice): HTMLElement {
     const settings = choice.current()
     const choose = (next: MatchSettings) => {
       choice.change(next)
       this.refresh()
     }
-    return [
+    // The seasons' rules open under their row from a "?", so the card stays light
+    const help = button('?', () => {
+      this.seasonHelpOpen = !this.seasonHelpOpen
+      this.refresh()
+    }, `help${this.seasonHelpOpen ? ' active' : ''}`)
+    help.title = t().seasonRules
+    const seasonRules = element('div', 'season-rules',
+      ...SEASONS.map((season) => element('p', '', element('b', '', t().seasons[season]), ` — ${t().seasonHints[season]}`)))
+    return element(
+      'div',
+      'choices',
       choiceRow(t().mapType, (['random', ...MAP_TYPES] as const).map((type) =>
         [t().mapTypes[type], settings.type === type, () => choose({ ...settings, type })])),
       choiceRow(t().mapSize, MAP_SIZES.map((size) =>
         [t().mapSizes[size], settings.size === size, () => choose({ ...settings, size })])),
-      choiceRow(t().season, (['random', ...SEASONS] as const).map((season) =>
+      choiceRow([t().season, help], (['random', ...SEASONS] as const).map((season) =>
         [t().seasons[season], settings.season === season, () => choose({ ...settings, season })])),
-      element('p', 'season-hint', t().seasonHints[settings.season]),
+      ...(this.seasonHelpOpen ? [seasonRules] : []),
       choiceRow(t().difficulty, DIFFICULTIES.map((difficulty) =>
         [t().difficulties[difficulty], settings.difficulty === difficulty, () => choose({ ...settings, difficulty })])),
-    ]
+    )
   }
 
   // Cards are rebuilt from scratch, e.g. when the language changes
@@ -136,11 +147,12 @@ export class Screens {
 }
 
 // A label and a row of buttons, one of them pressed
-function choiceRow(label: string, options: [string, boolean, () => void][]): HTMLElement {
+function choiceRow(label: string | (Node | string)[], options: [string, boolean, () => void][]): HTMLElement {
   const buttons = options.map(([text, active, onClick]) => {
     const node = button(text, onClick)
     node.classList.toggle('active', active)
     return node
   })
-  return element('div', 'choice', element('span', 'label', label), element('div', 'options', ...buttons))
+  const labelParts = typeof label === 'string' ? [label] : label
+  return element('div', 'choice', element('span', 'label', ...labelParts), element('div', 'options', ...buttons))
 }
