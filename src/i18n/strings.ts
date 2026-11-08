@@ -52,6 +52,8 @@ export const en = {
 
   pause: 'Pause (Space)',
   resume: 'Resume (Space)',
+  soundOff: 'Mute (M)',
+  soundOn: 'Unmute (M)',
   menu: 'Menu',
   continue: 'Continue',
   newMap: 'New map',
@@ -135,6 +137,8 @@ export const ru: Strings = {
 
   pause: 'Пауза (Пробел)',
   resume: 'Продолжить (Пробел)',
+  soundOff: 'Выключить звук (M)',
+  soundOn: 'Включить звук (M)',
   menu: 'Меню',
   continue: 'Продолжить',
   newMap: 'Новая карта',

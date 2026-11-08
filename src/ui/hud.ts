@@ -1,3 +1,4 @@
+import { sounds } from '../audio/sounds'
 import type { Game } from '../game'
 import { onLanguageChange, t } from '../i18n'
 import { landShare } from '../sim/territory'
@@ -20,6 +21,11 @@ const ICONS: Record<Stat, string> = {
 const MENU_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="12" height="2" rx="1"/><rect x="2" y="11" width="12" height="2" rx="1"/></svg>'
 const PAUSE_ICON ='<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>'
 const PLAY_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2.5v11l9-5.5z"/></svg>'
+// A speaker with sound waves, or crossed out when muted
+const SPEAKER = '<path d="M1.5 6h3l4-3.5v11l-4-3.5h-3z"/>'
+const LINE = 'fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"'
+const SOUND_ICON = `<svg viewBox="0 0 16 16" fill="currentColor">${SPEAKER}<path ${LINE} d="M10.8 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6.3 6.3 0 0 1 0 9"/></svg>`
+const MUTED_ICON = `<svg viewBox="0 0 16 16" fill="currentColor">${SPEAKER}<path ${LINE} d="M11 6l4 4M15 6l-4 4"/></svg>`
 
 interface Actions {
   togglePause(): void
@@ -37,6 +43,7 @@ export class Hud {
   private seasonHint = element('p', '')
   private season = withHint(this.seasonButton, this.seasonName, this.seasonHint)
   private pauseButton = button('', () => this.actions.togglePause(), 'icon-button')
+  private soundButton = button('', () => sounds.toggle(), 'icon-button')
   private speedButtons: HTMLButtonElement[] = []
 
   constructor(
@@ -63,12 +70,8 @@ export class Hud {
     setText(this.clock, formatTime(world.time))
     // On pause the button shows what it will do: play
     const resumes = this.game.paused && this.game.started
-    const label = resumes ? t().resume : t().pause
-    if (this.pauseButton.title !== label) {
-      this.pauseButton.title = label
-      this.pauseButton.ariaLabel = label
-      this.pauseButton.innerHTML = resumes ? PLAY_ICON : PAUSE_ICON
-    }
+    setIcon(this.pauseButton, resumes ? PLAY_ICON : PAUSE_ICON, resumes ? t().resume : t().pause)
+    setIcon(this.soundButton, sounds.muted ? MUTED_ICON : SOUND_ICON, sounds.muted ? t().soundOn : t().soundOff)
     SPEEDS.forEach((speed, i) => this.speedButtons[i].classList.toggle('active', speed === this.game.speed))
   }
 
@@ -92,7 +95,7 @@ export class Hud {
       menu,
       ...stats,
       element('div', 'when', this.season, this.clock),
-      element('div', 'group', speeds, this.pauseButton),
+      element('div', 'group', speeds, this.soundButton, this.pauseButton),
     )
     this.update()
   }
@@ -115,6 +118,14 @@ function countPeople(world: World, player: PlayerId): number {
   for (const village of world.villages) if (village.owner === player) count += Math.floor(village.population)
   for (const squad of world.squads) if (squad.owner === player) count += squad.count
   return count
+}
+
+// The label tells what a click will do; the picture changes along with it
+function setIcon(node: HTMLButtonElement, svg: string, label: string): void {
+  if (node.title === label) return
+  node.title = label
+  node.ariaLabel = label
+  node.innerHTML = svg
 }
 
 // Touch the page only when the text really changes: this runs every frame

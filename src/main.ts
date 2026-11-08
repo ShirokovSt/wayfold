@@ -1,5 +1,7 @@
 import './ui/styles.css'
 import logoUrl from './assets/logo.svg'
+import { EventWatcher } from './audio/events'
+import { sounds } from './audio/sounds'
 import { Game } from './game'
 import { currentLanguage, onLanguageChange, t } from './i18n'
 import { CameraControls } from './input/camera'
@@ -35,6 +37,7 @@ const buildMenu = new BuildMenu(stage, game, renderer.layout)
 const camera = new CameraControls(canvas, renderer.layout)
 const banner = document.querySelector<HTMLElement>('#banner')!
 const tutorial = new TutorialPanel(stage, skipTutorial)
+const events = new EventWatcher()
 let endShown = false
 let pausedBeforeMenu = false
 
@@ -157,6 +160,8 @@ window.addEventListener('keydown', (event) => {
   } else if (event.code === 'Space') {
     event.preventDefault() // otherwise Space would also press the focused button
     togglePause()
+  } else if (event.code === 'KeyM') {
+    sounds.toggle()
   } else {
     camera.key(event)
   }
@@ -175,6 +180,7 @@ function frame(now: number): void {
     game.update(TICK_SECONDS)
     pending -= TICK_MS
   }
+  for (const event of events.watch(game.world)) sounds.play(event)
   buildMenu.update()
   tutorial.update(game.world, game.paused)
   renderer.draw(game.paused ? 1 : pending / TICK_MS, now / 1000, {
