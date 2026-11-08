@@ -1,4 +1,3 @@
-import logoUrl from '../assets/logo.svg'
 import type { Game } from '../game'
 import { onLanguageChange, t } from '../i18n'
 import { landShare } from '../sim/territory'
@@ -18,6 +17,9 @@ const ICONS: Record<Stat, string> = {
   land: '<path d="M8 1.5l5.6 3.25v6.5L8 14.5l-5.6-3.25v-6.5z"/>',
   gold: '<circle cx="8" cy="8" r="5.6" fill="#f2c14e" stroke="#8a6514" stroke-width="1.5"/>',
 }
+const MENU_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="12" height="2" rx="1"/><rect x="2" y="11" width="12" height="2" rx="1"/></svg>'
+const PAUSE_ICON ='<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>'
+const PLAY_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2.5v11l9-5.5z"/></svg>'
 
 interface Actions {
   togglePause(): void
@@ -34,7 +36,7 @@ export class Hud {
   private seasonName = element('b', '')
   private seasonHint = element('p', '')
   private season = withHint(this.seasonButton, this.seasonName, this.seasonHint)
-  private pauseButton = button('', () => this.actions.togglePause())
+  private pauseButton = button('', () => this.actions.togglePause(), 'icon-button')
   private speedButtons: HTMLButtonElement[] = []
 
   constructor(
@@ -59,17 +61,22 @@ export class Hud {
     setText(this.seasonName, t().seasons[season])
     setText(this.seasonHint, t().seasonHints[season])
     setText(this.clock, formatTime(world.time))
-    setText(this.pauseButton, this.game.paused && this.game.started ? t().resume : t().pause)
+    // On pause the button shows what it will do: play
+    const resumes = this.game.paused && this.game.started
+    const label = resumes ? t().resume : t().pause
+    if (this.pauseButton.title !== label) {
+      this.pauseButton.title = label
+      this.pauseButton.ariaLabel = label
+      this.pauseButton.innerHTML = resumes ? PLAY_ICON : PAUSE_ICON
+    }
     SPEEDS.forEach((speed, i) => this.speedButtons[i].classList.toggle('active', speed === this.game.speed))
   }
 
   private build(): void {
-    const logo = element('img', '')
-    logo.src = logoUrl
-    logo.alt = ''
-    const menu = button(t().menu, () => this.actions.openMenu(), 'menu-button')
-    menu.prepend(logo)
+    const menu = button('', () => this.actions.openMenu(), 'icon-button')
+    menu.innerHTML = MENU_ICON
     menu.title = `${t().menu} (Esc)`
+    menu.ariaLabel = t().menu
     this.values = []
     const stats = PLAYERS.map((player) => {
       const values = { villages: element('b', ''), people: element('b', ''), land: element('b', ''), gold: element('b', '') }
