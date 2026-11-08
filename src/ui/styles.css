@@ -86,6 +86,48 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.when {
+  display: flex;
+  align-items: center;
+}
+
+.season {
+  position: relative;
+  z-index: 10;
+}
+
+.season-button {
+  padding: 2px 8px;
+  font-size: 16px;
+  line-height: 1.3;
+  background: transparent;
+  border-color: transparent;
+}
+
+.season-info {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 260px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 4px 0 #c9b791, 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+
+.season-info p {
+  margin: 4px 0 0;
+}
+
+.season:hover .season-info,
+.season.open .season-info {
+  display: block;
+}
+
 .clock {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
@@ -393,6 +435,13 @@ button.primary:hover {
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.season-hint {
+  margin: -4px 0 12px 74px;
+  color: #7d6a52;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .choice .label {

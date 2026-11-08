@@ -1,11 +1,11 @@
 import { hexDistance } from '../core/hex'
-import { ESTATE_RADIUS, isPassable } from './rules'
+import { ESTATE_RADIUS, isLand } from './rules'
 import type { BuildingKind, Cell, Village, World } from './world'
 
 // The village an own tile works for: the nearest village of the same owner;
 // on a tie the one held longer wins, then the older one
 export function estateVillage(world: World, cell: Cell): Village | null {
-  if (cell.owner === null || !isPassable(cell)) return null
+  if (cell.owner === null || !isLand(cell)) return null
   let best: Village | null = null
   let bestDistance = Infinity
   for (const village of world.villages) {

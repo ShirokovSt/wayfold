@@ -1,6 +1,6 @@
 import { hexDistance, hexToPoint } from '../core/hex'
 import { findPath } from './pathfind'
-import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, MOVE_COST, SQUAD_SPEED } from './rules'
+import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, SQUAD_SPEED, moveCost } from './rules'
 import { claimAround, paint } from './territory'
 import { canTake } from './towers'
 import { ensureCapital, strengthOf } from './villages'
@@ -60,7 +60,7 @@ export function moveSquads(world: World, dt: number): void {
   for (const squad of [...world.squads]) {
     squad.prevX = squad.x
     squad.prevY = squad.y
-    squad.progress += (SQUAD_SPEED * dt) / MOVE_COST[squad.path[squad.step + 1].terrain]
+    squad.progress += (SQUAD_SPEED * dt) / moveCost(world.map.season, squad.path[squad.step + 1].terrain)
     if (squad.progress >= 1) {
       squad.step++
       squad.progress -= 1

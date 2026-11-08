@@ -1,14 +1,14 @@
 import { hexDistance } from '../core/hex'
 import { estateBuildings, estateTiles } from './estates'
-import { BASE_GROWTH, FARM_GROWTH, GROWTH_PER_TILE, POPULATION_CAP, SOLDIER_STRENGTH, TOWN_GROWTH } from './rules'
+import { BASE_GROWTH, FARM_GROWTH, GROWTH_PER_TILE, POPULATION_CAP, SEASON_GROWTH, SOLDIER_STRENGTH, TOWN_GROWTH } from './rules'
 import type { Cell, PlayerId, Village, World } from './world'
 
-// People per second, from the estate and its farms; neutral villages only keep their garrison
+// People per second, from the estate and its farms, faster or slower by season; neutral villages only keep their garrison
 export function growthRate(world: World, village: Village): number {
   if (village.owner === null) return 0
   const farms = estateBuildings(world, village, 'farm').length
   const rate = BASE_GROWTH + GROWTH_PER_TILE * estateTiles(world, village).length + FARM_GROWTH * farms
-  return village.town ? rate * TOWN_GROWTH : rate
+  return rate * SEASON_GROWTH[world.map.season] * (village.town ? TOWN_GROWTH : 1)
 }
 
 // What one of the village's people is worth in a fight: a town's people are soldiers

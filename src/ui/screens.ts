@@ -2,7 +2,7 @@ import { version } from '../../package.json'
 import { onLanguageChange, t } from '../i18n'
 import { DIFFICULTIES } from '../ai/rival'
 import type { MatchSettings } from '../game'
-import { MAP_SIZES, MAP_TYPES } from '../sim/world'
+import { MAP_SIZES, MAP_TYPES, SEASONS } from '../sim/world'
 import { button, element } from './dom'
 import { formatTime } from './hud'
 import { languageSelect } from './languageSelect'
@@ -107,7 +107,7 @@ export class Screens {
     this.refresh()
   }
 
-  // Map type, size and difficulty rows; a click changes the setting and redraws the card
+  // Map type, size, season and difficulty rows; a click changes the setting and redraws the card
   private choices(choice: MatchChoice): HTMLElement[] {
     const settings = choice.current()
     const choose = (next: MatchSettings) => {
@@ -119,6 +119,9 @@ export class Screens {
         [t().mapTypes[type], settings.type === type, () => choose({ ...settings, type })])),
       choiceRow(t().mapSize, MAP_SIZES.map((size) =>
         [t().mapSizes[size], settings.size === size, () => choose({ ...settings, size })])),
+      choiceRow(t().season, (['random', ...SEASONS] as const).map((season) =>
+        [t().seasons[season], settings.season === season, () => choose({ ...settings, season })])),
+      element('p', 'season-hint', t().seasonHints[settings.season]),
       choiceRow(t().difficulty, DIFFICULTIES.map((difficulty) =>
         [t().difficulties[difficulty], settings.difficulty === difficulty, () => choose({ ...settings, difficulty })])),
     ]

@@ -1,4 +1,4 @@
-import type { BuildingKind, Cell, MapSize, Terrain } from './world'
+import type { BuildingKind, Cell, MapSize, Season, Terrain } from './world'
 
 // All the balance numbers in one place
 
@@ -13,14 +13,22 @@ export const MAP_DIMENSIONS: Record<MapSize, { width: number; height: number }> 
 export const LAND_PER_VILLAGE = 22 // roughly one village for this many land tiles...
 export const VILLAGE_PAIRS = { min: 3, max: 7 } // ...but from 6 to 14 villages in all
 
-// How many field tiles a step onto this terrain is worth; Infinity is impassable
-export const MOVE_COST: Record<Terrain, number> = {
-  field: 1,
-  forest: 2,
-  ford: 1.6,
-  mountain: Infinity,
-  water: Infinity,
+// How many summer field tiles a step onto this terrain is worth; Infinity is impassable.
+// Autumn mud slows fields, winter snow slows everything, spring floods slow the fords
+const SUMMER_COST: Record<Terrain, number> = { field: 1, forest: 2, ford: 1.6, ice: 1.6, mountain: Infinity, water: Infinity }
+const MOVE_COST: Record<Season, Record<Terrain, number>> = {
+  summer: SUMMER_COST,
+  autumn: { ...SUMMER_COST, field: 1.3 },
+  winter: { ...SUMMER_COST, field: 1.4, forest: 2.5 },
+  spring: { ...SUMMER_COST, ford: 3 },
 }
+
+export function moveCost(season: Season, terrain: Terrain): number {
+  return MOVE_COST[season][terrain]
+}
+
+export const SEASON_GROWTH: Record<Season, number> = { summer: 1, autumn: 1, winter: 0.7, spring: 1.25 }
+export const HARVEST_GOLD = 0.5 // in autumn every farm also brings this much gold per second
 
 export const SQUAD_SPEED = 1.0 // field tiles per second
 export const CLASH_DISTANCE = 0.7 // enemy squads closer than this fight (in hex radii; neighbor centers are 1.73 apart)
@@ -50,5 +58,10 @@ export const START_LAND_RADIUS = 2
 export const CAPTURE_LAND_RADIUS = 1 // a captured village claims the tiles right around it
 
 export function isPassable(cell: Cell): boolean {
-  return MOVE_COST[cell.terrain] < Infinity
+  return cell.terrain !== 'mountain' && cell.terrain !== 'water'
+}
+
+// Walkable tiles that can be owned: everything walkable but winter ice
+export function isLand(cell: Cell): boolean {
+  return isPassable(cell) && cell.terrain !== 'ice'
 }

@@ -3,9 +3,9 @@ import { type Random, createRandom } from '../core/rng'
 import type { GameMap } from '../sim/map'
 import { estateTiles, estateVillage } from '../sim/estates'
 import { TOWER_RANGE } from '../sim/rules'
-import type { Cell, Village, World } from '../sim/world'
+import type { Cell, Season, Village, World } from '../sim/world'
 import { type Layout, TILE_DEPTH } from './layout'
-import { LEAVES, ROCK, SANDBAR, SHADOW, TABLE, TERRAIN, WOOD, ownerTone } from './palette'
+import { FLOWERS, GRASS, LEAVES, PUDDLE, ROCK, SANDBAR, SHADOW, SNOW, TABLE, TERRAIN, WOOD, ownerTone } from './palette'
 
 const FACE = 0.93 // top face radius in tile sizes, the rest is the gap between tiles
 const BORDER = 0.8 // where the border line runs, inside the tile
@@ -53,7 +53,7 @@ export function drawGround(ctx: CanvasRenderingContext2D, map: GameMap, layout: 
   ctx.lineWidth = rounding
   for (const cell of map.cells) {
     const center = tileCenter(layout, cell)
-    const colors = TERRAIN[cell.terrain]
+    const colors = TERRAIN[map.season][cell.terrain]
     const radius = size * FACE - rounding / 2
 
     if (!isWater(cell)) {
@@ -70,7 +70,7 @@ export function drawGround(ctx: CanvasRenderingContext2D, map: GameMap, layout: 
     ctx.fill()
     ctx.stroke()
 
-    drawTexture(ctx, cell, center, size, createRandom(cell.index * 9973 + 17), fordAngle(map, cell))
+    drawTexture(ctx, cell, center, size, createRandom(cell.index * 9973 + 17), fordAngle(map, cell), map.season)
   }
 }
 
@@ -120,8 +120,8 @@ export function drawDecor(ctx: CanvasRenderingContext2D, map: GameMap, layout: L
       for (const spot of spots.slice(0, 3 + Math.floor(random() * 2)).sort((a, b) => a.y - b.y)) {
         const x = center.x + (spot.x + (random() - 0.5) * 0.12) * size
         const y = center.y + (spot.y + (random() - 0.5) * 0.12) * size + size * 0.2
-        if (random() < 0.4) drawPine(ctx, x, y, size, random)
-        else drawTree(ctx, x, y, size, random)
+        if (random() < 0.4) drawPine(ctx, x, y, size, random, map.season)
+        else drawTree(ctx, x, y, size, random, map.season)
       }
     } else if (cell.terrain === 'mountain') {
       drawMountain(ctx, center.x, center.y, size)
@@ -130,13 +130,13 @@ export function drawDecor(ctx: CanvasRenderingContext2D, map: GameMap, layout: L
 }
 
 function drawTexture(
-  ctx: CanvasRenderingContext2D, cell: Cell, center: Point, size: number, random: Random, fordAngle: number,
+  ctx: CanvasRenderingContext2D, cell: Cell, center: Point, size: number, random: Random, fordAngle: number, season: Season,
 ): void {
   const at = () => ({ x: center.x + (random() - 0.5) * size * 1.1, y: center.y + (random() - 0.5) * size * 0.9 })
   ctx.lineCap = 'round'
   if (cell.terrain === 'field') {
-    // Little tufts of grass
-    ctx.strokeStyle = 'rgba(90, 110, 40, 0.45)'
+    // Little tufts of grass; in spring flowers and puddles of melted snow
+    ctx.strokeStyle = GRASS[season]
     ctx.lineWidth = size * 0.035
     for (let i = 0; i < 5; i++) {
       const { x, y } = at()
@@ -144,6 +144,30 @@ function drawTexture(
       ctx.moveTo(x - size * 0.05, y - size * 0.07)
       ctx.lineTo(x, y)
       ctx.lineTo(x + size * 0.05, y - size * 0.07)
+      ctx.stroke()
+    }
+    if (season === 'spring') {
+      if (random() < 0.3) {
+        const { x, y } = at()
+        ellipse(ctx, x, y, size * 0.2, size * 0.08, PUDDLE.water)
+        ellipse(ctx, x - size * 0.06, y - size * 0.02, size * 0.07, size * 0.025, PUDDLE.shine)
+      }
+      for (const color of [...FLOWERS, ...FLOWERS]) {
+        const { x, y } = at()
+        ellipse(ctx, x, y, size * 0.05, size * 0.05, color)
+      }
+    }
+  } else if (cell.terrain === 'ice' || (cell.terrain === 'ford' && season === 'winter')) {
+    // Cracks in the ice
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'
+    ctx.lineWidth = size * 0.03
+    for (let i = 0; i < 2; i++) {
+      const { x, y } = at()
+      ctx.beginPath()
+      ctx.moveTo(x - size * 0.16, y - size * 0.04)
+      ctx.lineTo(x - size * 0.04, y + size * 0.03)
+      ctx.lineTo(x + size * 0.06, y - size * 0.02)
+      ctx.lineTo(x + size * 0.16, y + size * 0.05)
       ctx.stroke()
     }
   } else if (isWater(cell)) {
@@ -157,35 +181,38 @@ function drawTexture(
       ctx.quadraticCurveTo(x + size * 0.09, y + size * 0.07, x + size * 0.18, y)
       ctx.stroke()
     }
-    if (cell.terrain === 'ford') {
-      // A sandbar across the water with pebbles on it: the way over
-      ctx.beginPath()
-      ctx.ellipse(center.x, center.y, size * 0.74, size * 0.28, fordAngle, 0, Math.PI * 2)
-      ctx.fillStyle = SANDBAR.sand
-      ctx.strokeStyle = SANDBAR.edge
-      ctx.lineWidth = size * 0.04
-      ctx.fill()
-      ctx.stroke()
-      for (let i = -2; i <= 2; i++) {
-        const x = center.x + Math.cos(fordAngle) * i * size * 0.25
-        const y = center.y + Math.sin(fordAngle) * i * size * 0.25
-        ellipse(ctx, x, y, size * 0.06, size * 0.04, SANDBAR.pebble)
-      }
+  }
+  if (cell.terrain === 'ford') {
+    // A sandbar across the water with pebbles on it: the way over; spring floods half drown it
+    if (season === 'spring') ctx.globalAlpha = 0.55
+    ctx.beginPath()
+    ctx.ellipse(center.x, center.y, size * 0.74, size * 0.28, fordAngle, 0, Math.PI * 2)
+    ctx.fillStyle = SANDBAR.sand
+    ctx.strokeStyle = SANDBAR.edge
+    ctx.lineWidth = size * 0.04
+    ctx.fill()
+    ctx.stroke()
+    for (let i = -2; i <= 2; i++) {
+      const x = center.x + Math.cos(fordAngle) * i * size * 0.25
+      const y = center.y + Math.sin(fordAngle) * i * size * 0.25
+      ellipse(ctx, x, y, size * 0.06, size * 0.04, SANDBAR.pebble)
     }
+    ctx.globalAlpha = 1
   }
   ctx.lineCap = 'butt'
 }
 
-function drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, random: Random): void {
+function drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, random: Random, season: Season): void {
+  const leaves = LEAVES[season]
   const crown = size * (0.17 + random() * 0.05)
   ellipse(ctx, x + size * 0.04, y, crown * 1.1, crown * 0.4, SHADOW)
   ctx.fillStyle = WOOD.trunk
   ctx.fillRect(x - size * 0.035, y - size * 0.2, size * 0.07, size * 0.2)
   ctx.beginPath()
   ctx.arc(x, y - size * 0.2 - crown * 0.8, crown, 0, Math.PI * 2)
-  ctx.fillStyle = LEAVES[Math.floor(random() * LEAVES.length)]
+  ctx.fillStyle = leaves.crowns[Math.floor(random() * leaves.crowns.length)]
   ctx.fill()
-  ctx.strokeStyle = '#2f4a22'
+  ctx.strokeStyle = leaves.edge
   ctx.lineWidth = size * 0.025
   ctx.stroke()
   ctx.beginPath()
@@ -194,7 +221,7 @@ function drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, size: num
   ctx.fill()
 }
 
-function drawPine(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, random: Random): void {
+function drawPine(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, random: Random, season: Season): void {
   const width = size * (0.2 + random() * 0.05)
   ellipse(ctx, x + size * 0.04, y, width * 1.1, width * 0.4, SHADOW)
   ctx.fillStyle = WOOD.trunk
@@ -212,6 +239,17 @@ function drawPine(ctx: CanvasRenderingContext2D, x: number, y: number, size: num
     ctx.closePath()
     ctx.fill()
     ctx.stroke()
+    if (season === 'winter') {
+      // Snow on the upper half of each layer
+      ctx.beginPath()
+      ctx.moveTo(x - width * half * 0.55, y - size * (bottom + height * 0.45))
+      ctx.lineTo(x, y - size * (bottom + height))
+      ctx.lineTo(x + width * half * 0.55, y - size * (bottom + height * 0.45))
+      ctx.closePath()
+      ctx.fillStyle = SNOW
+      ctx.fill()
+      ctx.fillStyle = '#3f6b35'
+    }
   }
 }
 
@@ -262,8 +300,9 @@ export function ellipse(ctx: CanvasRenderingContext2D, x: number, y: number, rx:
   ctx.fill()
 }
 
+// Water, fords and ice lie lower than the land
 function isWater(cell: Cell): boolean {
-  return cell.terrain === 'water' || cell.terrain === 'ford'
+  return cell.terrain === 'water' || cell.terrain === 'ford' || cell.terrain === 'ice'
 }
 
 // Mixes a #rrggbb color with white (amount > 0) or black (amount < 0)

@@ -9,8 +9,13 @@ export const PLAYERS: readonly PlayerId[] = [HUMAN, RIVAL]
 // null means nobody's: wild land or a neutral village
 export type Owner = PlayerId | null
 
-// Ford: a walkable sandbar across a river or a strait between pieces of land
-export type Terrain = 'field' | 'forest' | 'mountain' | 'water' | 'ford'
+// Ford: a walkable sandbar across a river or a strait between pieces of land;
+// ice: a river or lake frozen in winter, walkable but not land anyone owns
+export type Terrain = 'field' | 'forest' | 'mountain' | 'water' | 'ford' | 'ice'
+
+// Each match is played in one season; it changes how fast squads walk and villages grow
+export type Season = 'summer' | 'autumn' | 'winter' | 'spring'
+export const SEASONS: readonly Season[] = ['summer', 'autumn', 'winter', 'spring']
 
 export type MapType = 'continent' | 'lakes' | 'peninsulas' | 'islands'
 export const MAP_TYPES: readonly MapType[] = ['continent', 'lakes', 'peninsulas', 'islands']

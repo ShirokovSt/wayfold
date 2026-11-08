@@ -1,6 +1,6 @@
 import { hexDistance } from '../core/hex'
 import { estateTiles } from './estates'
-import { BUILDING_COST, GOLD_PER_TILE, TOWER_RANGE, TOWN_COST } from './rules'
+import { BUILDING_COST, GOLD_PER_TILE, HARVEST_GOLD, TOWER_RANGE, TOWN_COST } from './rules'
 import { ownTiles } from './territory'
 import { type BuildingKind, type Cell, PLAYERS, type PlayerId, type Village, type World, opponent } from './world'
 
@@ -11,9 +11,13 @@ export function costOf(project: Project): number {
   return project === 'town' ? TOWN_COST : BUILDING_COST[project]
 }
 
-// Every own tile brings in a little gold
+// Every own tile brings in a little gold, and in autumn every own farm its harvest
 export function collectGold(world: World, dt: number): void {
-  for (const player of PLAYERS) world.gold[player] += GOLD_PER_TILE * ownTiles(world, player) * dt
+  const harvest = world.map.season === 'autumn' ? HARVEST_GOLD : 0
+  for (const player of PLAYERS) {
+    const farms = world.map.cells.filter((cell) => cell.owner === player && cell.building?.kind === 'farm').length
+    world.gold[player] += (GOLD_PER_TILE * ownTiles(world, player) + harvest * farms) * dt
+  }
 }
 
 // Buildings go on an own empty field inside the estate of one of the player's villages

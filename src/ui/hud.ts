@@ -2,10 +2,11 @@ import logoUrl from '../assets/logo.svg'
 import type { Game } from '../game'
 import { onLanguageChange, t } from '../i18n'
 import { landShare } from '../sim/territory'
-import { HUMAN, PLAYERS, type PlayerId, type World } from '../sim/world'
+import { HUMAN, PLAYERS, type PlayerId, type Season, type World } from '../sim/world'
 import { button, element } from './dom'
 
 const SPEEDS = [0.5, 1, 2]
+const SEASON_ICONS: Record<Season, string> = { summer: '☀', autumn: '🍂', winter: '❄', spring: '🌱' }
 
 interface Actions {
   togglePause(): void
@@ -13,10 +14,15 @@ interface Actions {
   setSpeed(speed: number): void
 }
 
-// The top bar holds only the match: the menu button, both players' numbers, the clock, speed and pause
+// The top bar holds only the match: the menu button, both players' numbers, the season, the clock, speed and pause
 export class Hud {
   private values: { player: PlayerId; villages: HTMLElement; people: HTMLElement; land: HTMLElement; gold: HTMLElement }[] = []
   private clock = element('span', 'clock')
+  // The season's icon; hovering or clicking it shows the season's rules
+  private seasonButton = button('', () => this.season.classList.toggle('open'), 'season-button')
+  private seasonName = element('b', '')
+  private seasonHint = element('p', '')
+  private season = element('div', 'season', this.seasonButton, element('div', 'season-info', this.seasonName, this.seasonHint))
   private pauseButton = button('', () => this.actions.togglePause())
   private speedButtons: HTMLButtonElement[] = []
 
@@ -27,6 +33,9 @@ export class Hud {
   ) {
     this.build()
     onLanguageChange(() => this.build())
+    document.addEventListener('pointerdown', (event) => {
+      if (!this.season.contains(event.target as Node)) this.season.classList.remove('open')
+    })
   }
 
   update(): void {
@@ -37,6 +46,10 @@ export class Hud {
       setText(people, String(countPeople(world, player)))
       setText(land, `${Math.round(landShare(world, player) * 100)}%`)
     }
+    const season = world.map.season
+    setText(this.seasonButton, SEASON_ICONS[season])
+    setText(this.seasonName, t().seasons[season])
+    setText(this.seasonHint, t().seasonHints[season])
     setText(this.clock, formatTime(world.time))
     setText(this.pauseButton, this.game.paused && this.game.started ? t().resume : t().pause)
     SPEEDS.forEach((speed, i) => this.speedButtons[i].classList.toggle('active', speed === this.game.speed))
@@ -70,7 +83,7 @@ export class Hud {
     this.root.replaceChildren(
       menu,
       ...stats,
-      this.clock,
+      element('div', 'when', this.season, this.clock),
       element('div', 'group', speeds, this.pauseButton),
     )
     this.update()

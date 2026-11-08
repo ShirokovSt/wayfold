@@ -1,6 +1,6 @@
 import type { Difficulty } from '../ai/rival'
 import type { Project } from '../sim/economy'
-import type { MapSize, MapType } from '../sim/world'
+import type { MapSize, MapType, Season } from '../sim/world'
 import type { StepId } from '../tutorial/tutorial'
 
 export const en = {
@@ -14,6 +14,15 @@ export const en = {
   } satisfies Record<MapType | 'random', string>,
   mapSize: 'Size',
   mapSizes: { small: 'Small', medium: 'Medium', large: 'Large' } satisfies Record<MapSize, string>,
+  season: 'Season',
+  seasons: { random: 'Random', summer: 'Summer', autumn: 'Autumn', winter: 'Winter', spring: 'Spring' } satisfies Record<Season | 'random', string>,
+  seasonHints: {
+    random: 'One of the four seasons, each with its own rules.',
+    summer: 'The usual rules.',
+    autumn: 'Harvest: every farm also brings gold. Mud: squads cross fields slower.',
+    winter: 'Rivers and lakes freeze and can be crossed; the sea does not. Snow slows squads everywhere, villages grow slower.',
+    spring: 'Villages grow faster. Floods: fords take twice as long to cross.',
+  } satisfies Record<Season | 'random', string>,
   difficulty: 'Rival',
   difficulties: { easy: 'Easy', normal: 'Normal', hard: 'Hard' } satisfies Record<Difficulty, string>,
   zoomIn: 'Zoom in (+)',
@@ -82,6 +91,15 @@ export const ru: Strings = {
   mapTypes: { random: 'Случайная', continent: 'Материк', lakes: 'Озёра', peninsulas: 'Полуострова', islands: 'Острова' },
   mapSize: 'Размер',
   mapSizes: { small: 'Малая', medium: 'Средняя', large: 'Большая' },
+  season: 'Время года',
+  seasons: { random: 'Случайное', summer: 'Лето', autumn: 'Осень', winter: 'Зима', spring: 'Весна' },
+  seasonHints: {
+    random: 'Одно из четырёх времён года, у каждого свои правила.',
+    summer: 'Обычные правила.',
+    autumn: 'Урожай: каждая ферма приносит ещё и золото. Распутица: по полям отряды идут медленнее.',
+    winter: 'Реки и озёра замерзают, по ним можно пройти, а море — нет. По снегу отряды везде идут медленнее, деревни растут медленнее.',
+    spring: 'Деревни растут быстрее. Половодье: броды переходить вдвое дольше.',
+  },
   difficulty: 'Соперник',
   difficulties: { easy: 'Лёгкий', normal: 'Обычный', hard: 'Сильный' },
   zoomIn: 'Приблизить (+)',

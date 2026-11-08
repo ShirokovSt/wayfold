@@ -21,6 +21,8 @@ import {
   type MapType,
   type Owner,
   RIVAL,
+  SEASONS,
+  type Season,
   type Village,
   type World,
   newWorld,
@@ -29,9 +31,10 @@ import {
 export interface MapSettings {
   size: MapSize
   type: MapType | 'random'
+  season?: Season | 'random' // summer when left out
 }
 
-export const DEFAULT_SETTINGS: MapSettings = { size: 'medium', type: 'random' }
+export const DEFAULT_SETTINGS: MapSettings = { size: 'medium', type: 'random', season: 'random' }
 
 // Each map type is a share of land and a "bias" that raises or lowers the land by position:
 // u and v go from -1 to 1 across the map, the players start near u = -0.7 and u = 0.7
@@ -52,19 +55,20 @@ const SMALLEST_ISLAND = 4 // smaller bits of land sink back into the sea
 // Some random maps are unplayable (a village walled in by mountains), so we try the next seed
 export function createWorld(seed: number, settings: MapSettings = DEFAULT_SETTINGS): World {
   const type = settings.type === 'random' ? pick(createRandom(seed), MAP_TYPES) : settings.type
+  const season = settings.season === 'random' ? pick(createRandom(seed + 1), SEASONS) : (settings.season ?? 'summer')
   for (let attempt = 0; attempt < 100; attempt++) {
-    const world = tryCreateWorld(seed + attempt * 7919, settings.size, type)
+    const world = tryCreateWorld(seed + attempt * 7919, settings.size, type, season)
     if (world) return world
   }
   throw new Error(`No playable map near seed ${seed}`)
 }
 
-function tryCreateWorld(seed: number, size: MapSize, type: MapType): World | null {
+function tryCreateWorld(seed: number, size: MapSize, type: MapType, season: Season): World | null {
   const random = createRandom(seed)
   const { width, height } = MAP_DIMENSIONS[size]
   const map = new GameMap(width, height)
   raiseLand(map, random, SHAPES[type])
-  if (type === 'continent') carveRiver(map, random)
+  const river = type === 'continent' ? carveRiver(map, random) : []
 
   // The second half of the map is the first half turned by 180°: the same land for both players
   for (const cell of map.cells.slice(0, map.cells.length / 2)) map.mirror(cell).terrain = cell.terrain
@@ -72,7 +76,31 @@ function tryCreateWorld(seed: number, size: MapSize, type: MapType): World | nul
 
   const villages = placeVillages(map, random)
   if (!villages || !allReachable(map, villages)) return null
+  // The season comes last, so the same seed gives the same map in every season
+  map.season = season
+  if (season === 'winter') freezeInlandWater(map, [...river, ...river.map((cell) => map.mirror(cell))])
   return newWorld(map, villages, type)
+}
+
+// Rivers and lakes freeze over, the sea does not: lakes are water that does not reach the map edge
+function freezeInlandWater(map: GameMap, river: Cell[]): void {
+  const frozen = new Set(river)
+  const seen = new Set<Cell>()
+  for (const start of map.cells) {
+    if (seen.has(start) || start.terrain !== 'water') continue
+    const body = [start]
+    seen.add(start)
+    for (let i = 0; i < body.length; i++) {
+      for (const next of map.neighbors(body[i])) {
+        if (!seen.has(next) && next.terrain === 'water') {
+          seen.add(next)
+          body.push(next)
+        }
+      }
+    }
+    if (!body.some((cell) => map.neighbors(cell).length < 6)) for (const cell of body) frozen.add(cell)
+  }
+  for (const cell of frozen) if (cell.terrain === 'water') cell.terrain = 'ice'
 }
 
 // Heights from noise plus the map type's bias; the lowest part becomes sea, the highest mountains
@@ -96,7 +124,7 @@ function raiseLand(map: GameMap, random: Random, shape: (typeof SHAPES)[MapType]
 }
 
 // On the mainland, a river from the map center up to the top edge, crossable only at fords
-function carveRiver(map: GameMap, random: Random): void {
+function carveRiver(map: GameMap, random: Random): Cell[] {
   const middleRow = (map.height - 1) / 2
   const start = map.cellAtOffset(map.rowLength(middleRow) / 2 - 1, middleRow)!
   const centerX = mapCenter(map).x
@@ -113,6 +141,7 @@ function carveRiver(map: GameMap, random: Random): void {
   // A ford in the middle of the map, another one up the river (and its mirror down the river)
   river[0].terrain = 'ford'
   river[Math.floor(river.length / 2) + randomInt(random, 0, 1)].terrain = 'ford'
+  return river
 }
 
 // Every piece of land must be reachable: tiny islands sink, bigger ones get a line of fords

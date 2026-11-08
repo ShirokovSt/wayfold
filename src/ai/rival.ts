@@ -126,7 +126,7 @@ export class Rival {
         .filter((from) => !guarded || from.town)
         .map((from) => ({ from, path: findPath(world.map, from.cell, to.cell) }))
         .filter((s) => s.path !== null)
-        .map(({ from, path }) => ({ from, time: pathDuration(path!), strength: this.strength(from) }))
+        .map(({ from, path }) => ({ from, time: pathDuration(world.map, path!), strength: this.strength(from) }))
         .sort((a, b) => a.time - b.time)
         .slice(0, this.profile.maxGroup)
 

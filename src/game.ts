@@ -2,7 +2,7 @@ import { DIFFICULTIES, type Difficulty, Rival } from './ai/rival'
 import { createRandom } from './core/rng'
 import { DEFAULT_SETTINGS, type MapSettings, createWorld } from './sim/mapgen'
 import { tick } from './sim/tick'
-import { MAP_SIZES, MAP_TYPES, RIVAL, type World } from './sim/world'
+import { MAP_SIZES, MAP_TYPES, RIVAL, SEASONS, type Season, type World } from './sim/world'
 import { readStored, store } from './storage'
 import { tutorialWorld } from './tutorial/tutorial'
 
@@ -10,6 +10,7 @@ const SETTINGS_KEY = 'wayfold.map'
 
 // What the new map card chooses: the map and how strong the rival is
 export interface MatchSettings extends MapSettings {
+  season: Season | 'random'
   difficulty: Difficulty
 }
 
@@ -61,6 +62,7 @@ function loadSettings(): MatchSettings {
   return {
     size: saved.size && MAP_SIZES.includes(saved.size) ? saved.size : DEFAULT_SETTINGS.size,
     type: saved.type === 'random' || (saved.type && MAP_TYPES.includes(saved.type)) ? saved.type : DEFAULT_SETTINGS.type,
+    season: saved.season === 'random' || (saved.season && SEASONS.includes(saved.season)) ? saved.season : 'random',
     difficulty: saved.difficulty && DIFFICULTIES.includes(saved.difficulty) ? saved.difficulty : 'normal',
   }
 }

@@ -1,10 +1,11 @@
 import { DIRECTIONS, type Hex, addHex, hexDistance } from '../core/hex'
-import type { Cell } from './world'
+import type { Cell, Season } from './world'
 
 // A rectangle of hexes; odd rows are one tile shorter and shifted half a tile right,
 // so the map looks the same after a 180° turn (both players get a fair start)
 export class GameMap {
   readonly cells: Cell[] = []
+  season: Season = 'summer'
   private readonly rowStarts: number[] = []
 
   constructor(

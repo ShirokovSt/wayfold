@@ -1,6 +1,6 @@
 import { hexDistance } from '../core/hex'
 import type { GameMap } from './map'
-import { MOVE_COST, SQUAD_SPEED, isPassable } from './rules'
+import { SQUAD_SPEED, isPassable, moveCost } from './rules'
 import type { Cell } from './world'
 
 // A* search for the quickest way; other villages are in the way, only the goal can be one
@@ -26,7 +26,7 @@ export function findPath(map: GameMap, from: Cell, to: Cell): Cell[] | null {
 
     for (const next of map.neighbors(current)) {
       if (!isPassable(next) || (next.village && next !== to)) continue
-      const nextCost = cost.get(current)! + MOVE_COST[next.terrain]
+      const nextCost = cost.get(current)! + moveCost(map.season, next.terrain)
       if (nextCost < (cost.get(next) ?? Infinity)) {
         cost.set(next, nextCost)
         cameFrom.set(next, current)
@@ -38,9 +38,9 @@ export function findPath(map: GameMap, from: Cell, to: Cell): Cell[] | null {
 }
 
 // Seconds a squad needs to walk the path
-export function pathDuration(path: Cell[]): number {
+export function pathDuration(map: GameMap, path: Cell[]): number {
   let cost = 0
-  for (const cell of path.slice(1)) cost += MOVE_COST[cell.terrain]
+  for (const cell of path.slice(1)) cost += moveCost(map.season, cell.terrain)
   return cost / SQUAD_SPEED
 }
 
