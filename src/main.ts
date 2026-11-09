@@ -1,6 +1,7 @@
 import './ui/styles.css'
 import logoUrl from './assets/logo.svg'
 import { EventWatcher } from './audio/events'
+import { music } from './audio/music'
 import { sounds } from './audio/sounds'
 import { Game } from './game'
 import { currentLanguage, onLanguageChange, t } from './i18n'
@@ -84,13 +85,18 @@ function openMenu(): void {
     input.hover = null
     buildMenu.close()
   }
-  const inMatch = game.started && game.world.winner === null
+  if (!inMatch()) music.play('menu')
   screens.menu({
     newMap: chooseNewMap,
     tutorial: startTutorial,
-    continue: inMatch ? continueMatch : undefined,
+    continue: inMatch() ? continueMatch : undefined,
     tutorialFirst: readStored(TUTORIAL_KEY) === null,
   })
+}
+
+// A match being played: the menu over it keeps the season's music
+function inMatch(): boolean {
+  return game.started && game.world.winner === null
 }
 
 function continueMatch(): void {
@@ -101,6 +107,7 @@ function continueMatch(): void {
 
 // The settings change only when Play is pressed; Back leaves them as they were
 function chooseNewMap(): void {
+  if (!inMatch()) music.play('menu') // e.g. straight from the victory card
   let settings = game.settings
   const choice = { current: () => settings, change: (next: typeof settings) => (settings = next) }
   const start = () => {
@@ -132,6 +139,7 @@ function skipTutorial(): void {
 }
 
 function startMatch(): void {
+  music.play(game.world.map.season)
   renderer.setWorld(game.world)
   input.drag = null
   buildMenu.close()
@@ -167,6 +175,8 @@ window.addEventListener('keydown', (event) => {
   }
 })
 openMenu()
+// Browsers allow sound only after the player has clicked or pressed a key
+for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, () => music.start())
 
 // Fixed-step simulation: ticks run at the same rate whatever the frame rate is
 let lastTime = performance.now()
@@ -180,7 +190,10 @@ function frame(now: number): void {
     game.update(TICK_SECONDS)
     pending -= TICK_MS
   }
-  for (const event of events.watch(game.world)) sounds.play(event)
+  for (const event of events.watch(game.world)) {
+    if (event === 'victory' || event === 'defeat') music.hush(6)
+    sounds.play(event)
+  }
   buildMenu.update()
   tutorial.update(game.world, game.paused)
   renderer.draw(game.paused ? 1 : pending / TICK_MS, now / 1000, {

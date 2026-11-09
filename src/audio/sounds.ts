@@ -6,9 +6,9 @@ const VOLUME_KEY = 'wayfold.volume'
 const LOUDEST = 0.8 // the output at full volume, so a few sounds at once do not crackle
 const REPEAT_GAP = 0.1 // seconds: the same sound twice in a row would only be louder
 
-interface Audio {
+export interface Audio {
   context: AudioContext
-  output: GainNode // the volume of everything
+  output: GainNode // the volume of everything: sounds and music
   noise: AudioBuffer
 }
 
@@ -43,17 +43,11 @@ class Sounds {
     this.volume = volume
     store(VOLUME_KEY, String(volume))
     this.setMuted(false)
-    if (this.audio) this.audio.output.gain.value = volume * LOUDEST
-  }
-
-  private setMuted(muted: boolean): void {
-    this.muted = muted
-    store(SOUND_KEY, muted ? 'off' : 'on')
   }
 
   play(event: SoundEvent): void {
     if (this.silent) return
-    const audio = this.open()
+    const audio = this.output()
     const time = audio.context.currentTime
     if (time - (this.lastPlayed.get(event) ?? -1) < REPEAT_GAP) return
     this.lastPlayed.set(event, time)
@@ -63,23 +57,37 @@ class Sounds {
   // A soft ping of its own, to hear the volume while setting it
   preview(): void {
     if (this.silent) return
-    const audio = this.open()
+    const audio = this.output()
     const time = audio.context.currentTime
     tone(audio, time, { from: NOTE.G5, length: 0.35, volume: 0.25 })
     tone(audio, time, { wave: 'triangle', from: NOTE.G5 * 2, length: 0.15, volume: 0.05 })
   }
 
-  // Browsers allow sound only after the player has clicked the page; by the first event they have
-  private open(): Audio {
+  // Browsers allow sound only after the player has clicked the page; call it after a click
+  output(): Audio {
     if (!this.audio) {
       const context = new AudioContext()
       const output = context.createGain()
-      output.gain.value = this.volume * LOUDEST
       output.connect(context.destination)
       this.audio = { context, output, noise: whiteNoise(context) }
+      this.applyVolume()
+      // A hidden tab stops the game, so the sound waits for it too
+      document.addEventListener('visibilitychange', () => {
+        void (document.hidden ? context.suspend() : context.resume())
+      })
     }
-    if (this.audio.context.state === 'suspended') void this.audio.context.resume()
+    if (this.audio.context.state === 'suspended' && !document.hidden) void this.audio.context.resume()
     return this.audio
+  }
+
+  private setMuted(muted: boolean): void {
+    this.muted = muted
+    store(SOUND_KEY, muted ? 'off' : 'on')
+    this.applyVolume()
+  }
+
+  private applyVolume(): void {
+    if (this.audio) this.audio.output.gain.value = this.silent ? 0 : this.volume * LOUDEST
   }
 }
 
