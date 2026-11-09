@@ -89,6 +89,7 @@ function openMenu(): void {
   screens.menu({
     newMap: chooseNewMap,
     tutorial: startTutorial,
+    settings: () => screens.settings(openMenu),
     continue: inMatch() ? continueMatch : undefined,
     tutorialFirst: readStored(TUTORIAL_KEY) === null,
   })

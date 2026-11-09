@@ -1,4 +1,6 @@
 import { version } from '../../package.json'
+import { music } from '../audio/music'
+import { sounds } from '../audio/sounds'
 import { onLanguageChange, t } from '../i18n'
 import { DIFFICULTIES } from '../ai/rival'
 import type { MatchSettings } from '../game'
@@ -16,6 +18,7 @@ export interface MatchChoice {
 export interface MenuActions {
   newMap(): void
   tutorial(): void
+  settings(): void
   continue?: () => void // only while a match is on
   tutorialFirst: boolean // offered first until it has been played once
 }
@@ -40,6 +43,7 @@ export class Screens {
       const buttons = [button(t().newMap, actions.newMap), button(t().tutorial, actions.tutorial)]
       if (actions.tutorialFirst) buttons.reverse()
       if (actions.continue) buttons.unshift(button(t().continue, actions.continue))
+      buttons.push(button(t().settings, actions.settings))
       buttons[0].classList.add('primary')
       return element(
         'div',
@@ -47,10 +51,28 @@ export class Screens {
         element('h1', '', t().title),
         element('p', 'tagline', t().tagline),
         element('div', 'menu-buttons', ...buttons),
-        languageSelect(),
         element('p', 'credits', `v${version} · © 2026 Stanislav Shirokov`),
       )
     })
+  }
+
+  // The music, the game's sounds and the language
+  settings(onBack: () => void): void {
+    this.show(onBack, () =>
+      element(
+        'div',
+        'card settings',
+        element('h2', '', t().settings),
+        element(
+          'div',
+          'choices',
+          settingRow(t().music, volumeSlider(music.volume, (volume) => music.setVolume(volume))),
+          settingRow(t().effects, volumeSlider(sounds.volume, (volume) => sounds.setVolume(volume), () => sounds.preview())),
+          settingRow(t().language, languageSelect()),
+        ),
+        element('div', 'actions', button(t().back, onBack)),
+      ),
+    )
   }
 
   newMap(choice: MatchChoice, onPlay: () => void, onBack: () => void): void {
@@ -144,6 +166,22 @@ export class Screens {
     this.root.replaceChildren(this.content())
     this.root.hidden = false
   }
+}
+
+function settingRow(label: string, control: HTMLElement): HTMLElement {
+  return element('label', 'choice', element('span', 'label', label), element('div', 'options', control))
+}
+
+// From 0 to 100; letting go can play something, to hear the new volume
+function volumeSlider(value: number, onChange: (volume: number) => void, onRelease?: () => void): HTMLInputElement {
+  const slider = element('input', 'volume')
+  slider.type = 'range'
+  slider.min = '0'
+  slider.max = '100'
+  slider.value = String(Math.round(value * 100))
+  slider.addEventListener('input', () => onChange(Number(slider.value) / 100))
+  if (onRelease) slider.addEventListener('change', onRelease)
+  return slider
 }
 
 // A label and a row of buttons, one of them pressed

@@ -8,7 +8,8 @@ const REPEAT_GAP = 0.1 // seconds: the same sound twice in a row would only be l
 
 export interface Audio {
   context: AudioContext
-  output: GainNode // the volume of everything: sounds and music
+  output: GainNode // everything goes out through here: silent while muted
+  effects: GainNode // the volume of the game's sounds; the music has its own
   noise: AudioBuffer
 }
 
@@ -20,33 +21,32 @@ interface Tone {
   volume: number
 }
 
-// Every sound is made here from plain waves and noise, the way the board is drawn in code
+// Every sound is made here from plain waves and noise, the way the board is drawn in code.
+// The speaker in the top bar mutes everything at once, music included
 class Sounds {
   muted = readStored(SOUND_KEY) === 'off'
-  volume = savedVolume() // 0..1
+  volume = savedVolume(VOLUME_KEY, 0.75) // of the game's sounds, 0..1
   private audio: Audio | null = null
   private lastPlayed = new Map<SoundEvent, number>()
 
-  // Silent either way: switched off, or the volume turned all the way down
-  get silent(): boolean {
-    return this.muted || this.volume === 0
-  }
-
-  // Switched on with the volume at zero, it comes back at half, or nothing would change
   toggle(): void {
     this.setMuted(!this.muted)
-    if (!this.muted && this.volume === 0) this.setVolume(0.5)
   }
 
-  // Moving the volume also switches the sound back on
+  // Moving a volume also switches the sound back on
+  unmute(): void {
+    if (this.muted) this.setMuted(false)
+  }
+
   setVolume(volume: number): void {
     this.volume = volume
     store(VOLUME_KEY, String(volume))
-    this.setMuted(false)
+    this.unmute()
+    this.applyVolume()
   }
 
   play(event: SoundEvent): void {
-    if (this.silent) return
+    if (this.muted || this.volume === 0) return
     const audio = this.output()
     const time = audio.context.currentTime
     if (time - (this.lastPlayed.get(event) ?? -1) < REPEAT_GAP) return
@@ -56,7 +56,7 @@ class Sounds {
 
   // A soft ping of its own, to hear the volume while setting it
   preview(): void {
-    if (this.silent) return
+    if (this.muted || this.volume === 0) return
     const audio = this.output()
     const time = audio.context.currentTime
     tone(audio, time, { from: NOTE.G5, length: 0.35, volume: 0.25 })
@@ -69,7 +69,9 @@ class Sounds {
       const context = new AudioContext()
       const output = context.createGain()
       output.connect(context.destination)
-      this.audio = { context, output, noise: whiteNoise(context) }
+      const effects = context.createGain()
+      effects.connect(output)
+      this.audio = { context, output, effects, noise: whiteNoise(context) }
       this.applyVolume()
       // A hidden tab stops the game, so the sound waits for it too
       document.addEventListener('visibilitychange', () => {
@@ -87,15 +89,18 @@ class Sounds {
   }
 
   private applyVolume(): void {
-    if (this.audio) this.audio.output.gain.value = this.silent ? 0 : this.volume * LOUDEST
+    if (!this.audio) return
+    this.audio.output.gain.value = this.muted ? 0 : LOUDEST
+    this.audio.effects.gain.value = this.volume
   }
 }
 
 export const sounds = new Sounds()
 
-function savedVolume(): number {
-  const volume = Number(readStored(VOLUME_KEY) ?? 0.75)
-  return volume >= 0 && volume <= 1 ? volume : 0.75
+// A saved volume from 0 to 1, or the given one
+export function savedVolume(key: string, fallback: number): number {
+  const volume = Number(readStored(key) ?? fallback)
+  return volume >= 0 && volume <= 1 ? volume : fallback
 }
 
 const NOTE = { C4: 261.6, Eb4: 311.1, G4: 392, C5: 523.3, E5: 659.3, G5: 784, C6: 1046.5 }
@@ -174,7 +179,7 @@ function fade(audio: Audio, time: number, length: number, volume: number): GainN
   gain.gain.setValueAtTime(0.0001, time)
   gain.gain.exponentialRampToValueAtTime(volume, time + 0.005)
   gain.gain.exponentialRampToValueAtTime(0.0001, time + length)
-  gain.connect(audio.output)
+  gain.connect(audio.effects)
   return gain
 }
 

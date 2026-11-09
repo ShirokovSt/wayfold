@@ -1,4 +1,3 @@
-import { music } from '../audio/music'
 import { sounds } from '../audio/sounds'
 import type { Game } from '../game'
 import { onLanguageChange, t } from '../i18n'
@@ -27,10 +26,6 @@ const SPEAKER = '<path d="M1.5 6h3l4-3.5v11l-4-3.5h-3z"/>'
 const LINE = 'fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"'
 const SOUND_ICON = `<svg viewBox="0 0 16 16" fill="currentColor">${SPEAKER}<path ${LINE} d="M10.8 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6.3 6.3 0 0 1 0 9"/></svg>`
 const MUTED_ICON = `<svg viewBox="0 0 16 16" fill="currentColor">${SPEAKER}<path ${LINE} d="M11 6l4 4M15 6l-4 4"/></svg>`
-// Two joined notes, or crossed out when the music is off
-const NOTES = '<circle cx="4.3" cy="12" r="2.2"/><circle cx="11.8" cy="10.4" r="2.2"/><path d="M5.6 12V3.6l8.4-2v8.8h-1.2V5L6.8 6.4V12z"/>'
-const MUSIC_ICON = `<svg viewBox="0 0 16 16" fill="currentColor">${NOTES}</svg>`
-const MUSIC_OFF_ICON = `<svg viewBox="0 0 16 16" fill="currentColor" opacity="0.6">${NOTES}<path ${LINE} d="M1.5 1.5l13 13"/></svg>`
 
 interface Actions {
   togglePause(): void
@@ -48,9 +43,8 @@ export class Hud {
   private seasonHint = element('p', '')
   private season = withHint(this.seasonButton, this.seasonName, this.seasonHint)
   private pauseButton = button('', () => this.actions.togglePause(), 'icon-button')
+  // Quiet at once, music included; the volumes are in the menu's settings
   private soundButton = button('', () => sounds.toggle(), 'icon-button')
-  private musicButton = button('', () => music.toggle(), 'icon-button')
-  private volume = volumeSlider()
   private speedButtons: HTMLButtonElement[] = []
 
   constructor(
@@ -78,11 +72,7 @@ export class Hud {
     // On pause the button shows what it will do: play
     const resumes = this.game.paused && this.game.started
     setIcon(this.pauseButton, resumes ? PLAY_ICON : PAUSE_ICON, resumes ? t().resume : t().pause)
-    setIcon(this.soundButton, sounds.silent ? MUTED_ICON : SOUND_ICON, sounds.silent ? t().soundOn : t().soundOff)
-    setIcon(this.musicButton, music.on ? MUSIC_ICON : MUSIC_OFF_ICON, music.on ? t().musicOff : t().musicOn)
-    const volume = String(Math.round(sounds.volume * 100))
-    if (this.volume.value !== volume) this.volume.value = volume
-    this.volume.classList.toggle('off', sounds.silent)
+    setIcon(this.soundButton, sounds.muted ? MUTED_ICON : SOUND_ICON, sounds.muted ? t().soundOn : t().soundOff)
     SPEEDS.forEach((speed, i) => this.speedButtons[i].classList.toggle('active', speed === this.game.speed))
   }
 
@@ -102,13 +92,11 @@ export class Hud {
     this.speedButtons = SPEEDS.map((speed) => button(`×${speed}`, () => this.actions.setSpeed(speed)))
     const speeds = element('div', 'speed', ...this.speedButtons)
     speeds.title = t().speed
-    this.volume.title = t().volume
-    this.volume.ariaLabel = t().volume
     this.root.replaceChildren(
       menu,
       ...stats,
       element('div', 'when', this.season, this.clock),
-      element('div', 'group', speeds, this.pauseButton, element('div', 'sound', this.soundButton, this.musicButton, this.volume)),
+      element('div', 'group', speeds, this.pauseButton, this.soundButton),
     )
     this.update()
   }
@@ -131,20 +119,6 @@ function countPeople(world: World, player: PlayerId): number {
   for (const village of world.villages) if (village.owner === player) count += Math.floor(village.population)
   for (const squad of world.squads) if (squad.owner === player) count += squad.count
   return count
-}
-
-// On release it pings, to hear the new volume, and gives the arrow keys back to the map
-function volumeSlider(): HTMLInputElement {
-  const slider = element('input', 'volume')
-  slider.type = 'range'
-  slider.min = '0'
-  slider.max = '100'
-  slider.addEventListener('input', () => sounds.setVolume(Number(slider.value) / 100))
-  slider.addEventListener('change', () => {
-    slider.blur()
-    sounds.preview()
-  })
-  return slider
 }
 
 // The label tells what a click will do; the picture changes along with it

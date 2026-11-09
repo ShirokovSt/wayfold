@@ -196,23 +196,6 @@ button.primary:hover {
   height: 14px;
 }
 
-.sound {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 6px;
-}
-
-.volume {
-  width: 80px;
-  accent-color: var(--paper);
-  cursor: pointer;
-}
-
-.volume.off {
-  opacity: 0.4;
-}
-
 .speed button:first-child {
   border-radius: 8px 0 0 8px;
 }
@@ -434,21 +417,25 @@ button.primary:hover {
   background: #efe3c8;
 }
 
-.language {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #7d6a52;
-  font-size: 14px;
-}
-
 .credits {
-  margin: 18px 0 0;
+  margin: 0;
   color: #9c8a70;
   font-size: 12px;
 }
 
-.language select {
+/* Settings: a slider for each volume, the language in a drop-down */
+
+.card.settings .choices {
+  width: min(380px, calc(100vw - 112px));
+}
+
+.card .volume {
+  width: 100%;
+  accent-color: var(--you);
+  cursor: pointer;
+}
+
+.card select.language {
   font: inherit;
   color: var(--ink);
   background: transparent;

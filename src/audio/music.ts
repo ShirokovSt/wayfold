@@ -1,9 +1,10 @@
 import { readStored, store } from '../storage'
 import { bell, drum, lute, makeBand, recorder, type Band } from './instruments'
-import { sounds } from './sounds'
+import { savedVolume, sounds } from './sounds'
 import { type Bar, type Lead, type Theme, type Tune, TUNES, parsePart, pitchOf } from './tunes'
 
-const MUSIC_KEY = 'wayfold.music'
+const VOLUME_KEY = 'wayfold.musicVolume'
+const OLD_SWITCH_KEY = 'wayfold.music' // the music button of 0.3.0: 'off' becomes a volume of zero
 const LEVEL = 0.4 // the music stays under the sounds of the game
 const AHEAD = 1 // seconds of music written ahead of time
 const FADE = 1.5 // seconds to fade a tune in or out
@@ -77,16 +78,19 @@ function slotsOf(tune: Tune): Slot[] {
 
 // The music of the menu and of each season; switching fades one tune out and the next one in
 class Music {
-  on = readStored(MUSIC_KEY) !== 'off'
+  volume = savedVolume(VOLUME_KEY, readStored(OLD_SWITCH_KEY) === 'off' ? 0 : 0.75) // 0 is off
   private theme: Theme = 'menu'
+  private awake = false // after the first click, when the browser allows sound
   private player: Player | null = null
   private bus: GainNode | null = null
+  private mixer: GainNode | null = null // the music's own volume
   private timer = 0
 
   // Browsers allow sound only after a click, so every click makes sure the sound is awake
   start(): void {
+    this.awake = true
     sounds.output()
-    if (this.on && !this.player) this.begin()
+    if (this.volume > 0 && !this.player) this.begin()
   }
 
   play(theme: Theme): void {
@@ -98,11 +102,14 @@ class Music {
     }
   }
 
-  toggle(): void {
-    this.on = !this.on
-    store(MUSIC_KEY, this.on ? 'on' : 'off')
-    if (this.on) this.begin()
-    else this.end()
+  // At zero the music stops altogether, and comes back when turned up
+  setVolume(volume: number): void {
+    this.volume = volume
+    store(VOLUME_KEY, String(volume))
+    sounds.unmute()
+    if (this.mixer) this.mixer.gain.value = volume
+    if (volume === 0) this.end()
+    else if (this.awake && !this.player) this.begin()
   }
 
   // Steps aside for a few seconds, so the tune of a victory or a defeat sounds clear
@@ -122,10 +129,15 @@ class Music {
     const { context } = audio
     const now = context.currentTime
     const tune = TUNES[this.theme]
+    if (!this.mixer) {
+      this.mixer = context.createGain()
+      this.mixer.gain.value = this.volume
+      this.mixer.connect(audio.output)
+    }
     const bus = context.createGain()
     bus.gain.setValueAtTime(0, now)
     bus.gain.linearRampToValueAtTime(LEVEL, now + FADE)
-    bus.connect(audio.output)
+    bus.connect(this.mixer)
     this.bus = bus
     this.player = new Player(makeBand(context, bus, audio.noise, tune.hall), tune, now + 0.3)
     clearInterval(this.timer)
