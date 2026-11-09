@@ -4,7 +4,7 @@ import { type Project, build, canBuild, costOf, upgradeToTown } from '../sim/eco
 import { estateBuildings, estateTiles } from '../sim/estates'
 import { findPath, pathDuration } from '../sim/pathfind'
 import { POPULATION_CAP } from '../sim/rules'
-import { sendSquad, squadTarget } from '../sim/squads'
+import { type Share, sendSquad, squadCell, squadSize, squadTarget } from '../sim/squads'
 import { isGuarded } from '../sim/towers'
 import { growthRate, strengthOf } from '../sim/villages'
 import { type BuildingKind, type Cell, type PlayerId, type Village, type World, opponent } from '../sim/world'
@@ -19,13 +19,26 @@ interface Profile {
   margin: number // extra people sent on top of what the target should have on arrival
   maxGroup: number // villages that may attack one target together
   defendChance: number // how likely it notices that a village of its own is under attack
+  watch: Watch
   builds: Project[]
 }
 
+// Which enemy squads a village keeps a garrison against: none (it sends everyone),
+// those heading for it, or also those passing close by, which could turn to it
+type Watch = 'none' | 'aimed' | 'nearby'
+const NEARBY = 3 // tiles
+
+// Like the player, the rival sends either half of a village's people or all of them
+interface Sender {
+  from: Village
+  time: number // seconds to the target
+  shares: Share[] // what it may send and still keep its garrison, smaller first
+}
+
 const PROFILES: Record<Difficulty, Profile> = {
-  easy: { firstMove: 20, think: 6, margin: 6, maxGroup: 1, defendChance: 0.5, builds: ['farm'] },
-  normal: { firstMove: 10, think: 3.5, margin: 4, maxGroup: 3, defendChance: 1, builds: ['farm', 'town', 'tower'] },
-  hard: { firstMove: 6, think: 2, margin: 4, maxGroup: 4, defendChance: 1, builds: ['farm', 'town', 'tower'] },
+  easy: { firstMove: 20, think: 6, margin: 6, maxGroup: 1, defendChance: 0.5, watch: 'none', builds: ['farm'] },
+  normal: { firstMove: 10, think: 3.5, margin: 4, maxGroup: 3, defendChance: 1, watch: 'aimed', builds: ['farm', 'town', 'tower'] },
+  hard: { firstMove: 6, think: 2, margin: 4, maxGroup: 4, defendChance: 1, watch: 'nearby', builds: ['farm', 'town', 'tower'] },
 }
 
 // A simple opponent: every few seconds it makes one move — defend, capture or raid — and spends its gold
@@ -104,52 +117,104 @@ export class Rival {
   // Sends help to a village that an enemy squad is about to take
   private defend(world: World): boolean {
     for (const village of this.villages(world)) {
-      const shortfall = incoming(world, village, (owner) => owner !== this.player) - village.population -
+      const shortfall = this.threat(world, village, false) - village.population * strengthOf(village) -
         incoming(world, village, (owner) => owner === this.player)
       if (shortfall <= 0) continue
-      const helper = this.villages(world)
-        .filter((other) => other !== village && other.population > shortfall + this.profile.margin)
-        .sort((a, b) => hexDistance(a.cell.hex, village.cell.hex) - hexDistance(b.cell.hex, village.cell.hex))[0]
-      if (helper && sendSquad(world, this.player, helper, village.cell)) return true
+      const needed = shortfall + this.profile.margin
+      const helpers = this.villages(world)
+        .filter((other) => other !== village)
+        .sort((a, b) => hexDistance(a.cell.hex, village.cell.hex) - hexDistance(b.cell.hex, village.cell.hex))
+      for (const helper of helpers) {
+        const share = this.shares(world, helper).find((share) => this.power(helper, share) >= needed)
+        if (share && sendSquad(world, this.player, helper, village.cell, share)) return true
+      }
     }
     return false
   }
 
   // Picks the cheapest and closest village it can surely take, sending from up to maxGroup of
-  // its nearest villages together; guarded villages only with soldiers
+  // its nearest villages together; guarded villages only with soldiers. Each sender sends all it may,
+  // then the group sends halves wherever the rest is still enough
   private capture(world: World): boolean {
-    let best: { group: Village[]; to: Village; score: number } | null = null
+    let best: { group: Sender[]; shares: Share[]; to: Village; score: number } | null = null
     for (const to of world.villages) {
       if (to.owner === this.player) continue
       const guarded = isGuarded(world, to.cell, this.player)
-      const senders = this.villages(world)
+      const senders: Sender[] = this.villages(world)
         .filter((from) => !guarded || from.town)
         .map((from) => ({ from, path: findPath(world.map, from.cell, to.cell) }))
         .filter((s) => s.path !== null)
-        .map(({ from, path }) => ({ from, time: pathDuration(world.map, path!), strength: this.strength(from) }))
+        .map(({ from, path }) => ({ from, time: pathDuration(world.map, path!), shares: this.shares(world, from) }))
+        .filter((s) => s.shares.length > 0)
         .sort((a, b) => a.time - b.time)
         .slice(0, this.profile.maxGroup)
 
       let strength = 0
       for (const [i, sender] of senders.entries()) {
-        strength += sender.strength
+        strength += this.power(sender.from, sender.shares[sender.shares.length - 1])
         const needed = (to.population + growthRate(world, to) * sender.time) * strengthOf(to) + this.profile.margin -
           incoming(world, to, (owner) => owner === this.player)
         const score = sender.time + needed * 0.3 + i * 3 // a lone attack is simpler, so it is preferred
         if (strength >= needed && (!best || score < best.score)) {
-          best = { group: senders.slice(0, i + 1).map((s) => s.from), to, score }
+          const group = senders.slice(0, i + 1)
+          best = { group, shares: this.smallestShares(group, needed), to, score }
           break
         }
       }
     }
     if (!best) return false
-    for (const from of best.group) sendSquad(world, this.player, from, best.to.cell)
+    best.group.forEach((sender, i) => sendSquad(world, this.player, sender.from, best.to.cell, best.shares[i]))
     return true
   }
 
-  // What the village's people are worth in a fight if they all set off now
-  private strength(village: Village): number {
-    return Math.floor(village.population) * strengthOf(village)
+  // Starts with everyone the group may send, then sends half instead wherever the attack stays strong enough
+  private smallestShares(group: Sender[], needed: number): Share[] {
+    const shares = group.map((sender) => sender.shares[sender.shares.length - 1])
+    let total = group.reduce((sum, sender, i) => sum + this.power(sender.from, shares[i]), 0)
+    group.forEach((sender, i) => {
+      if (shares[i] === 'half' || !sender.shares.includes('half')) return
+      const saved = this.power(sender.from, 'all') - this.power(sender.from, 'half')
+      if (total - saved >= needed) {
+        shares[i] = 'half'
+        total -= saved
+      }
+    })
+    return shares
+  }
+
+  // What the village may send and still keep its garrison home; an easy rival only ever sends everyone
+  private shares(world: World, village: Village): Share[] {
+    const people = Math.floor(village.population)
+    const options: Share[] = this.profile.watch === 'none' ? ['all'] : ['half', 'all']
+    const garrison = this.garrison(world, village)
+    return options.filter((share) => {
+      const count = squadSize(people, share)
+      return count >= 1 && people - count >= garrison
+    })
+  }
+
+  // People who stay home to hold the village against the enemy squads it watches
+  private garrison(world: World, village: Village): number {
+    if (this.profile.watch === 'none') return 0
+    const threat = this.threat(world, village, this.profile.watch === 'nearby')
+    return threat > 0 ? Math.ceil(threat / strengthOf(village)) + 1 : 0
+  }
+
+  // The strength of enemy squads heading for the village, and if asked, of those passing close by
+  private threat(world: World, village: Village, nearby: boolean): number {
+    let power = 0
+    for (const squad of world.squads) {
+      if (squad.owner === this.player) continue
+      const aimed = squadTarget(squad) === village.cell
+      const close = nearby && hexDistance(squadCell(squad).hex, village.cell.hex) <= NEARBY
+      if (aimed || close) power += squad.count * squad.strength
+    }
+    return power
+  }
+
+  // What a squad of this share is worth in a fight
+  private power(village: Village, share: Share): number {
+    return squadSize(village.population, share) * strengthOf(village)
   }
 
   // A full village with nothing to take marches over the nearest enemy land and back:
@@ -162,7 +227,8 @@ export class Rival {
     const towers = enemyLand.filter((cell) => cell.building?.kind === 'tower')
     const open = enemyLand.filter((cell) => !isGuarded(world, cell, this.player))
     const target = nearest(soldiers && towers.length > 0 ? towers : soldiers ? enemyLand : open, full.cell)
-    return target !== null && sendSquad(world, this.player, full, target) !== null
+    const share = this.shares(world, full)[0]
+    return target !== null && share !== undefined && sendSquad(world, this.player, full, target, share) !== null
   }
 
   private villages(world: World): Village[] {
@@ -170,13 +236,13 @@ export class Rival {
   }
 }
 
-// People in squads heading to the village whose owner matches
+// The strength of squads heading to the village whose owner matches
 function incoming(world: World, village: Village, matches: (owner: PlayerId) => boolean): number {
-  let count = 0
+  let power = 0
   for (const squad of world.squads) {
-    if (squadTarget(squad) === village.cell && matches(squad.owner)) count += squad.count
+    if (squadTarget(squad) === village.cell && matches(squad.owner)) power += squad.count * squad.strength
   }
-  return count
+  return power
 }
 
 function nearest(cells: Cell[], to: Cell): Cell | null {
