@@ -3,7 +3,6 @@ import type { GameMap } from './map'
 import { findPath } from './pathfind'
 import {
   CLASH_DISTANCE,
-  FIRST_RAID,
   LAIR_BOUNTY,
   PACK_GROWTH,
   PACK_SPEED,
@@ -23,7 +22,8 @@ export const BITE_SECONDS = 0.8 // a wolf's leap out to a squad and back
 
 // A den on the cell, with wild land around it
 export function makeLair(map: GameMap, cell: Cell, pair: number, size: number): Lair {
-  const lair: Lair = { cell, pair, size, pack: size, raidIn: FIRST_RAID, raids: 0 }
+  const lair: Lair = { cell, pair, size, pack: size, raidIn: 0, raids: 0 }
+  lair.raidIn = untilRaid(map, lair) // the first raid comes like any other, sooner in a hungry season
   cell.lair = lair
   cell.terrain = 'field' // the den stands in a clearing, so trees do not hide it
   for (const near of map.within(cell, WILD_RADIUS)) near.wild = true
@@ -68,7 +68,7 @@ function clearLair(world: World, lair: Lair, winner: PlayerId): void {
 // as an empty neutral village has little to hunt
 function raid(world: World, lair: Lair): void {
   lair.raids++
-  lair.raidIn = RAID_EVERY[world.map.season] * (0.67 + 0.66 * jitter(lair.pair * 31 + lair.raids))
+  lair.raidIn = untilRaid(world.map, lair)
   const count = Math.min(RAID_SIZE.max, Math.floor(lair.pack / 2))
   if (count < RAID_SIZE.min) return
   const distance = (village: Village) => hexDistance(village.cell.hex, lair.cell.hex)
@@ -182,6 +182,11 @@ function place(pack: Pack): void {
   const to = next ? hexToPoint(next.hex, 1) : from
   pack.x = from.x + (to.x - from.x) * pack.progress
   pack.y = from.y + (to.y - from.y) * pack.progress
+}
+
+// Seconds to the next raid: the season's interval, give or take a third
+function untilRaid(map: GameMap, lair: Lair): number {
+  return RAID_EVERY[map.season] * (0.67 + 0.66 * jitter(lair.pair * 31 + lair.raids))
 }
 
 // A steady "random" number from 0 to 1, the same for both dens of a pair

@@ -83,10 +83,11 @@ function tryCreateWorld(seed: number, size: MapSize, type: MapType, season: Seas
 
   const villages = placeVillages(map, random)
   if (!villages || !allReachable(map, villages)) return null
+  // The season changes no tile until the frost below, so the same seed gives the same map in every season;
+  // the dens need it already, to time their first raid
+  map.season = season
   // Dens have their own random numbers, so turning beasts on or off leaves the rest of the map as it was
   const lairs = beasts === 'none' ? [] : placeLairs(map, villages, LAIR_COUNT[size][beasts], createRandom(seed + 104729))
-  // The season comes last, so the same seed gives the same map in every season
-  map.season = season
   if (season === 'winter') freezeInlandWater(map, [...river, ...river.map((cell) => map.mirror(cell))])
   return newWorld(map, villages, type, lairs)
 }

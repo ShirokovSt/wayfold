@@ -35,9 +35,12 @@ export class TutorialPanel {
     if (this.active && STEPS[this.step].done?.(world, paused)) this.show(this.step + 1)
   }
 
-  // The villages the current step talks about, to be ringed on the board
+  // The villages and the den the current step talks about, to be ringed on the board
   marked(world: World): Cell[] {
-    return this.active ? STEPS[this.step].marked.map((id) => world.villages[id].cell) : []
+    if (!this.active) return []
+    const step = STEPS[this.step]
+    const villages = step.marked.map((id) => world.villages[id].cell)
+    return step.den ? [...villages, ...world.lairs.map((lair) => lair.cell)] : villages
   }
 
   private show(step: number): void {

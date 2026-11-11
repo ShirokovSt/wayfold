@@ -67,3 +67,5 @@ export const WOLF = { fur: '#8f8a82', dark: '#45413c', belly: '#cfc8bb', eye: '#
 export const WILD_TONE: Tone = { main: '#8f8a82', dark: '#45413c', light: '#ebe6dc' }
 export const WILD_LAND = 'rgba(40, 45, 25, 0.22)'
 export const CLAW = '#f4eedf'
+// Hint cards drawn on the board, like the paper cards of the top bar
+export const HINT = { card: '#f5ecd9', ink: '#3b2a1d', shadow: 'rgba(0, 0, 0, 0.35)' }

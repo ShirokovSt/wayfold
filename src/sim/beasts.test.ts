@@ -4,10 +4,10 @@ import { EventWatcher } from '../audio/events'
 import { addLair, addVillage, handmadeWorld } from './handmade'
 import { createWorld } from './mapgen'
 import { findPath } from './pathfind'
-import { LAIR_BOUNTY, LAIR_COUNT, LAIR_GAP, TICK_SECONDS } from './rules'
+import { LAIR_BOUNTY, LAIR_COUNT, LAIR_GAP, RAID_EVERY, TICK_SECONDS } from './rules'
 import { sendSquad } from './squads'
 import { tick } from './tick'
-import { HUMAN, MAP_SIZES, RIVAL, type World } from './world'
+import { HUMAN, MAP_SIZES, RIVAL, SEASONS, type Season, type World } from './world'
 
 const FIELD = ['............', '...........', '............', '...........', '............']
 
@@ -39,6 +39,15 @@ describe('wolves', () => {
     for (const village of world.villages) expect(findPath(world.map, world.villages[0].cell, village.cell)).not.toBeNull()
     expect(world.map.cells.filter((cell) => cell.wild && cell.owner !== null)).toHaveLength(0)
     expect(createWorld(3, { size, type: 'continent', beasts: 'none' }).lairs).toHaveLength(0)
+  })
+
+  it('raid first sooner in a hungrier season', () => {
+    const first = (season: Season) => createWorld(4, { size: 'small', type: 'continent', season, beasts: 'few' }).lairs[0].raidIn
+    expect(first('winter')).toBeLessThan(first('summer'))
+    for (const season of SEASONS) {
+      expect(first(season)).toBeGreaterThanOrEqual(RAID_EVERY[season] * 0.67)
+      expect(first(season)).toBeLessThanOrEqual(RAID_EVERY[season] * 1.33)
+    }
   })
 
   it('find room even on crowded small maps', () => {

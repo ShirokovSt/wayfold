@@ -2,7 +2,8 @@ import type { Drag } from '../input/pointer'
 import { squadSize } from '../sim/squads'
 import { ARROW_SECONDS } from '../sim/towers'
 import { BITE_SECONDS } from '../sim/beasts'
-import { type Bite, type Cell, HUMAN, type Pack, type Squad, type World } from '../sim/world'
+import { t } from '../i18n'
+import { type Bite, type Cell, HUMAN, type Lair, type Pack, type Squad, type World } from '../sim/world'
 import {
   drawDecor, drawEstates, drawGround, drawTable, drawTerritory, drawTowerZones, drawWildLand, hexPath, tileCenter,
 } from './board'
@@ -10,7 +11,7 @@ import {
   TOWER_TOP, drawArrow, drawBadge, drawBuilding, drawClaws, drawCrown, drawLair, drawPerson, drawVillage, drawWolf,
 } from './figures'
 import { Layout } from './layout'
-import { GOLD, WILD_TONE, ownerTone } from './palette'
+import { GOLD, HINT, WILD_TONE, ownerTone } from './palette'
 
 // Where the walkers of a squad stand around its position, in tile sizes; at most this many are drawn
 const FORMATION = [
@@ -142,6 +143,34 @@ export class Renderer {
       drawBadge(ctx, x, y + size * 0.55, String(Math.floor(lair.pack)), size, WILD_TONE)
     }
     if (view.drag) this.drawLeaving(view.drag)
+    const den = view.hover?.lair
+    if (den && !view.drag) this.drawLairHint(den)
+  }
+
+  // A small card over the hovered den: what it is, how many wolves it holds and what clearing it brings
+  private drawLairHint(lair: Lair): void {
+    const ctx = this.ctx
+    const { x, y } = tileCenter(this.layout, lair.cell)
+    const lines = [t().lairName, `${t().lairPack}: ${Math.floor(lair.pack)}`, t().lairBounty]
+    ctx.font = '600 13px system-ui, sans-serif'
+    const width = Math.max(...lines.map((line) => ctx.measureText(line).width)) + 24
+    const height = lines.length * 18 + 14
+    const left = Math.min(Math.max(8, x - width / 2), this.width - width - 8)
+    const top = Math.max(8, y - this.layout.size * 0.9 - height)
+    ctx.beginPath()
+    ctx.roundRect(left, top, width, height, 10)
+    ctx.fillStyle = HINT.card
+    ctx.shadowColor = HINT.shadow
+    ctx.shadowBlur = 12
+    ctx.fill()
+    ctx.shadowBlur = 0
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'top'
+    lines.forEach((line, i) => {
+      ctx.font = i === 0 ? '700 13px system-ui, sans-serif' : '13px system-ui, sans-serif'
+      ctx.fillStyle = HINT.ink
+      ctx.fillText(line, left + 12, top + 8 + i * 18)
+    })
   }
 
   private drawLayers(): void {

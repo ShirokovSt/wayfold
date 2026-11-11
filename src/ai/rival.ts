@@ -37,6 +37,7 @@ interface Target {
   defence(seconds: number): number // its strength when a squad gets there
 }
 const WILD_LOSSES = 3 // people a squad may lose to bites on its way to a den
+const TOWER_LOSSES = 1.5 // a squad under a tower's volleys needs about half as many again
 
 // Like the player, the rival sends either half of a village's people or all of them
 interface Sender {
@@ -179,12 +180,18 @@ export class Rival {
   private targets(world: World): Target[] {
     const villages = world.villages
       .filter((village) => village.owner !== this.player)
-      .map((village) => ({
-        cell: village.cell,
-        guarded: isGuarded(world, village.cell, this.player),
-        bounty: 0,
-        defence: (seconds: number) => (village.population + growthRate(world, village) * seconds) * strengthOf(village),
-      }))
+      .map((village) => {
+        const guarded = isGuarded(world, village.cell, this.player)
+        // A tower thins the squad out on its way in, so a guarded village takes a bigger one
+        const towerLosses = guarded ? TOWER_LOSSES : 1
+        return {
+          cell: village.cell,
+          guarded,
+          bounty: 0,
+          defence: (seconds: number) =>
+            (village.population + growthRate(world, village) * seconds) * strengthOf(village) * towerLosses,
+        }
+      })
     const lairs = world.lairs.map((lair) => ({
       cell: lair.cell,
       guarded: false,

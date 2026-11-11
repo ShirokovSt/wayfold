@@ -63,6 +63,21 @@ describe('tutorial', () => {
     expect(path.some((cell) => isGuarded(world, cell, HUMAN))).toBe(false)
   })
 
+  it('has a den off the ways to the neutral villages, cleared by a big enough squad', () => {
+    const world = tutorialWorld()
+    const [capital, near, far] = world.villages
+    expect(world.map.cells.filter((cell) => cell.wild && cell.owner !== null)).toHaveLength(0)
+    for (const village of [near, far]) {
+      expect(findPath(world.map, capital.cell, village.cell)!.some((cell) => cell.wild)).toBe(false)
+    }
+    expect(step('wolves').done!(world, false)).toBe(false)
+    capital.population = 30
+    sendSquad(world, HUMAN, capital, world.lairs[0].cell)
+    play(world, 20)
+    expect(step('wolves').done!(world, false)).toBe(true)
+    expect(world.packs).toHaveLength(0) // the tutorial's wolves never raid
+  })
+
   it('can be played to the end against the waiting rival', () => {
     const world = tutorialWorld()
     play(world, 10 * 60, new Rival(HUMAN, createRandom(3)))
