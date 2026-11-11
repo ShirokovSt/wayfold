@@ -1,3 +1,4 @@
+import { updateBeasts } from './beasts'
 import { collectGold } from './economy'
 import { moveSquads, resolveClashes } from './squads'
 import { fireTowers } from './towers'
@@ -10,6 +11,7 @@ export function tick(world: World, dt: number): void {
   growVillages(world, dt)
   collectGold(world, dt)
   moveSquads(world, dt)
+  updateBeasts(world, dt)
   fireTowers(world, dt)
   resolveClashes(world)
   world.winner = findWinner(world)

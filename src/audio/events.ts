@@ -1,7 +1,9 @@
+import { packTarget } from '../sim/beasts'
 import { squadTarget } from '../sim/squads'
-import { HUMAN, type Owner, type PlayerId, type Squad, type World } from '../sim/world'
+import { type Cell, HUMAN, type Lair, type Owner, type Pack, type PlayerId, type Squad, type World } from '../sim/world'
 
-export type SoundEvent = 'send' | 'capture' | 'loss' | 'repelled' | 'build' | 'town' | 'victory' | 'defeat'
+export type SoundEvent =
+  | 'send' | 'capture' | 'loss' | 'repelled' | 'build' | 'town' | 'victory' | 'defeat' | 'howl' | 'growl'
 
 // The world as it was on the last frame: the sounds come from what has changed since
 interface Snapshot {
@@ -10,6 +12,8 @@ interface Snapshot {
   towns: boolean[]
   squads: Set<Squad>
   buildings: Set<number> // indexes of cells with a building
+  lairs: Set<Lair>
+  packs: Map<Pack, { returning: boolean; target: Cell }> // where each was running then
   winner: PlayerId | null
 }
 
@@ -38,14 +42,28 @@ export class EventWatcher {
     for (const index of now.buildings) {
       if (!last.buildings.has(index) && world.map.cells[index].owner === HUMAN) events.add('build')
     }
+    // Wolves: a howl when a pack sets off for your village, a growl when it gets there; a cleared den rings like a capture
+    for (const lair of last.lairs) if (!now.lairs.has(lair) && lair.cell.owner === HUMAN) events.add('capture')
+    for (const pack of now.packs.keys()) {
+      if (!last.packs.has(pack) && packTarget(pack).village?.owner === HUMAN) events.add('howl')
+    }
+    for (const [pack, before] of last.packs) {
+      if (before.returning) continue
+      // It turned home, or fell at the village: either way it got there
+      const struck = now.packs.get(pack)?.returning === true || (!now.packs.has(pack) && pack.step === pack.path.length - 1)
+      if (struck && before.target.village?.owner === HUMAN) events.add('growl')
+    }
     return [...events]
   }
 }
 
-// A squad that reached a village of someone else's and left it in the same hands
+// A squad that reached a village of someone else's and left it in the same hands, or lost to a den's pack
 function wasRepelled(squad: Squad, last: Snapshot): boolean {
-  const village = squadTarget(squad).village
-  if (!village || squad.step !== squad.path.length - 1) return false // it fell on the way
+  if (squad.step !== squad.path.length - 1) return false // it fell on the way
+  const target = squadTarget(squad)
+  if (target.lair) return squad.owner === HUMAN
+  const village = target.village
+  if (!village) return false
   const ownerBefore = last.owners[last.world.villages.indexOf(village)]
   return village.owner !== squad.owner && village.owner === ownerBefore && (squad.owner === HUMAN || village.owner === HUMAN)
 }
@@ -59,6 +77,8 @@ function snapshot(world: World): Snapshot {
     towns: world.villages.map((village) => village.town),
     squads: new Set(world.squads),
     buildings,
+    lairs: new Set(world.lairs),
+    packs: new Map(world.packs.map((pack) => [pack, { returning: pack.returning, target: packTarget(pack) }])),
     winner: world.winner,
   }
 }

@@ -1,4 +1,5 @@
 import { hexDistance, hexToPoint } from '../core/hex'
+import { fightLair } from './beasts'
 import { findPath } from './pathfind'
 import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, SQUAD_SPEED, moveCost } from './rules'
 import { claimAround, paint } from './territory'
@@ -101,7 +102,12 @@ function arrive(world: World, squad: Squad): void {
     removeSquad(world, squad)
     return
   }
-  // A raid ends on open land, and the squad walks back home
+  if (cell.lair) fightLair(world, squad, cell.lair)
+  if (squad.count === 0) {
+    removeSquad(world, squad)
+    return
+  }
+  // A raid ends on open land, or at a cleared den, and the squad walks back home
   const home = squad.home.owner === squad.owner ? squad.home : nearestVillage(world, cell, squad.owner)
   const path = home && findPath(world.map, cell, home.cell)
   if (!home || !path) {

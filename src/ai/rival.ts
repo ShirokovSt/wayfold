@@ -1,9 +1,10 @@
 import { hexDistance } from '../core/hex'
 import type { Random } from '../core/rng'
 import { type Project, build, canBuild, costOf, upgradeToTown } from '../sim/economy'
+import { packTarget } from '../sim/beasts'
 import { estateBuildings, estateTiles } from '../sim/estates'
 import { findPath, pathDuration } from '../sim/pathfind'
-import { POPULATION_CAP } from '../sim/rules'
+import { LAIR_BOUNTY, PACK_GROWTH, POPULATION_CAP } from '../sim/rules'
 import { type Share, sendSquad, squadCell, squadSize, squadTarget } from '../sim/squads'
 import { isGuarded } from '../sim/towers'
 import { growthRate, strengthOf } from '../sim/villages'
@@ -27,6 +28,15 @@ interface Profile {
 // those heading for it, or also those passing close by, which could turn to it
 type Watch = 'none' | 'aimed' | 'nearby'
 const NEARBY = 3 // tiles
+
+// Something to attack: a village, or a wolves' den worth its bounty
+interface Target {
+  cell: Cell
+  guarded: boolean // only soldiers can take it
+  bounty: number // gold for taking it
+  defence(seconds: number): number // its strength when a squad gets there
+}
+const WILD_LOSSES = 3 // people a squad may lose to bites on its way to a den
 
 // Like the player, the rival sends either half of a village's people or all of them
 interface Sender {
@@ -114,11 +124,11 @@ export class Rival {
     return world.villages.filter((village) => village.owner === opponent(this.player))
   }
 
-  // Sends help to a village that an enemy squad is about to take
+  // Sends help to a village that an enemy squad or a wolf pack is about to take or thin out
   private defend(world: World): boolean {
     for (const village of this.villages(world)) {
       const shortfall = this.threat(world, village, false) - village.population * strengthOf(village) -
-        incoming(world, village, (owner) => owner === this.player)
+        incoming(world, village.cell, (owner) => owner === this.player)
       if (shortfall <= 0) continue
       const needed = shortfall + this.profile.margin
       const helpers = this.villages(world)
@@ -136,15 +146,13 @@ export class Rival {
   // its nearest villages together; guarded villages only with soldiers. Each sender sends all it may,
   // then the group sends halves wherever the rest is still enough
   private capture(world: World): boolean {
-    let best: { group: Sender[]; shares: Share[]; to: Village; score: number } | null = null
-    for (const to of world.villages) {
-      if (to.owner === this.player) continue
-      const guarded = isGuarded(world, to.cell, this.player)
+    let best: { group: Sender[]; shares: Share[]; to: Target; score: number } | null = null
+    for (const to of this.targets(world)) {
       const senders: Sender[] = this.villages(world)
-        .filter((from) => !guarded || from.town)
+        .filter((from) => !to.guarded || from.town)
         .map((from) => ({ from, path: findPath(world.map, from.cell, to.cell) }))
         .filter((s) => s.path !== null)
-        .map(({ from, path }) => ({ from, time: pathDuration(world.map, path!), shares: this.shares(world, from) }))
+        .map(({ from, path }) => ({ from, time: pathDuration(world.map, path!), shares: this.shares(world, from, to) }))
         .filter((s) => s.shares.length > 0)
         .sort((a, b) => a.time - b.time)
         .slice(0, this.profile.maxGroup)
@@ -152,9 +160,9 @@ export class Rival {
       let strength = 0
       for (const [i, sender] of senders.entries()) {
         strength += this.power(sender.from, sender.shares[sender.shares.length - 1])
-        const needed = (to.population + growthRate(world, to) * sender.time) * strengthOf(to) + this.profile.margin -
-          incoming(world, to, (owner) => owner === this.player)
-        const score = sender.time + needed * 0.3 + i * 3 // a lone attack is simpler, so it is preferred
+        const needed = to.defence(sender.time) + this.profile.margin - incoming(world, to.cell, (owner) => owner === this.player)
+        // A lone attack is simpler, so it is preferred; a den's bounty makes it a little more tempting
+        const score = sender.time + needed * 0.3 + i * 3 - to.bounty * 0.1
         if (strength >= needed && (!best || score < best.score)) {
           const group = senders.slice(0, i + 1)
           best = { group, shares: this.smallestShares(group, needed), to, score }
@@ -165,6 +173,26 @@ export class Rival {
     if (!best) return false
     best.group.forEach((sender, i) => sendSquad(world, this.player, sender.from, best.to.cell, best.shares[i]))
     return true
+  }
+
+  // Villages that are not its own, and wolves' dens: what each will have to be beaten by on arrival
+  private targets(world: World): Target[] {
+    const villages = world.villages
+      .filter((village) => village.owner !== this.player)
+      .map((village) => ({
+        cell: village.cell,
+        guarded: isGuarded(world, village.cell, this.player),
+        bounty: 0,
+        defence: (seconds: number) => (village.population + growthRate(world, village) * seconds) * strengthOf(village),
+      }))
+    const lairs = world.lairs.map((lair) => ({
+      cell: lair.cell,
+      guarded: false,
+      bounty: LAIR_BOUNTY,
+      // The bites on the way through the wild land cost a few people too
+      defence: (seconds: number) => Math.min(lair.size, lair.pack + PACK_GROWTH * seconds) + WILD_LOSSES,
+    }))
+    return [...villages, ...lairs]
   }
 
   // Starts with everyone the group may send, then sends half instead wherever the attack stays strong enough
@@ -182,10 +210,11 @@ export class Rival {
     return shares
   }
 
-  // What the village may send and still keep its garrison home; an easy rival only ever sends everyone
-  private shares(world: World, village: Village): Share[] {
+  // What the village may send and still keep its garrison home; an easy rival only ever sends everyone.
+  // A den brings gold but no new home, so no village is emptied for it
+  private shares(world: World, village: Village, to?: Target): Share[] {
     const people = Math.floor(village.population)
-    const options: Share[] = this.profile.watch === 'none' ? ['all'] : ['half', 'all']
+    const options: Share[] = to?.bounty ? ['half'] : this.profile.watch === 'none' ? ['all'] : ['half', 'all']
     const garrison = this.garrison(world, village)
     return options.filter((share) => {
       const count = squadSize(people, share)
@@ -200,14 +229,17 @@ export class Rival {
     return threat > 0 ? Math.ceil(threat / strengthOf(village)) + 1 : 0
   }
 
-  // The strength of enemy squads heading for the village, and if asked, of those passing close by
+  // The strength of enemy squads and wolf packs heading for the village, and if asked, of those passing close by
   private threat(world: World, village: Village, nearby: boolean): number {
     let power = 0
+    const close = (cell: Cell) => nearby && hexDistance(cell.hex, village.cell.hex) <= NEARBY
     for (const squad of world.squads) {
       if (squad.owner === this.player) continue
-      const aimed = squadTarget(squad) === village.cell
-      const close = nearby && hexDistance(squadCell(squad).hex, village.cell.hex) <= NEARBY
-      if (aimed || close) power += squad.count * squad.strength
+      if (squadTarget(squad) === village.cell || close(squadCell(squad))) power += squad.count * squad.strength
+    }
+    for (const pack of world.packs) {
+      if (pack.returning) continue
+      if (packTarget(pack) === village.cell || close(pack.path[pack.step])) power += pack.count
     }
     return power
   }
@@ -236,11 +268,11 @@ export class Rival {
   }
 }
 
-// The strength of squads heading to the village whose owner matches
-function incoming(world: World, village: Village, matches: (owner: PlayerId) => boolean): number {
+// The strength of squads heading to the cell whose owner matches
+function incoming(world: World, cell: Cell, matches: (owner: PlayerId) => boolean): number {
   let power = 0
   for (const squad of world.squads) {
-    if (squadTarget(squad) === village.cell && matches(squad.owner)) power += squad.count * squad.strength
+    if (squadTarget(squad) === cell && matches(squad.owner)) power += squad.count * squad.strength
   }
   return power
 }

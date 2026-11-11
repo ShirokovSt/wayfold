@@ -1,7 +1,7 @@
 import { ellipse } from './board'
 import type { Point } from '../core/hex'
 import type { BuildingKind } from '../sim/world'
-import { FARM, GOLD, ROCK, SHADOW, STEEL, STONE, type Tone, WOOD } from './palette'
+import { CLAW, FARM, GOLD, ROCK, SHADOW, STEEL, STONE, type Tone, WOLF, WOOD } from './palette'
 
 // Village pieces: three little houses with roofs in the owner's color and a flag;
 // a town stands inside a stone wall, with a keep at the back, clear of the capital's crown
@@ -325,6 +325,110 @@ export function drawArrow(ctx: CanvasRenderingContext2D, from: Point, to: Point,
   ctx.moveTo(tail.x, tail.y)
   ctx.lineTo(head.x, head.y)
   ctx.stroke()
+  ctx.lineCap = 'butt'
+}
+
+// A wolves' den: a mound of rocks with a dark way in, and a wolf on watch beside it
+export function drawLair(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, time: number): void {
+  ellipse(ctx, x, y + size * 0.12, size * 0.48, size * 0.18, SHADOW)
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = size * 0.03
+  ctx.strokeStyle = ROCK.dark
+  const mound = ctx.createLinearGradient(0, y - size * 0.45, 0, y + size * 0.15)
+  mound.addColorStop(0, ROCK.light)
+  mound.addColorStop(1, ROCK.dark)
+  ctx.fillStyle = mound
+  ctx.beginPath()
+  ctx.moveTo(x - size * 0.42, y + size * 0.12)
+  ctx.quadraticCurveTo(x - size * 0.38, y - size * 0.3, x - size * 0.05, y - size * 0.38)
+  ctx.quadraticCurveTo(x + size * 0.32, y - size * 0.36, x + size * 0.4, y + size * 0.12)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = WOLF.dark // the way in
+  ctx.beginPath()
+  ctx.ellipse(x - size * 0.02, y + size * 0.1, size * 0.15, size * 0.18, 0, Math.PI, 0)
+  ctx.closePath()
+  ctx.fill()
+  for (const [sx, sy, r] of [[-0.32, 0.13, 0.06], [0.3, 0.14, 0.05], [0.2, -0.22, 0.04]]) {
+    ctx.fillStyle = ROCK.light
+    ctx.beginPath()
+    ctx.arc(x + sx * size, y + sy * size, r * size, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+  }
+  drawWolf(ctx, x + size * 0.36, y + size * 0.26, size * 0.85, time * 2, -1, true)
+}
+
+// A wolf seen from the side; `phase` swings the legs, `facing` is 1 for right and -1 for left
+export function drawWolf(
+  ctx: CanvasRenderingContext2D, x: number, y: number, size: number, phase: number, facing: number, sitting = false,
+): void {
+  const h = size * 0.3
+  ellipse(ctx, x, y, h * 0.6, h * 0.12, SHADOW)
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale(facing, 1)
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = WOLF.dark
+  const swing = sitting ? 0 : Math.sin(phase) * h * 0.14
+  const body = sitting ? -h * 0.62 : -h * 0.55
+  ctx.lineWidth = h * 0.11
+  ctx.beginPath()
+  for (const [legX, sway] of [[-0.35, swing], [-0.2, -swing], [0.25, -swing], [0.4, swing]]) {
+    if (sitting && legX < 0) continue
+    ctx.moveTo(legX * h, body + h * 0.1)
+    ctx.lineTo(legX * h + sway, 0)
+  }
+  ctx.stroke()
+  // Tail, body and head
+  ctx.lineWidth = h * 0.09
+  ctx.beginPath()
+  ctx.moveTo(-h * 0.5, body - h * 0.05)
+  ctx.quadraticCurveTo(-h * 0.8, body + h * 0.05, -h * 0.85, body + h * (sitting ? 0.5 : 0.3))
+  ctx.stroke()
+  ctx.fillStyle = WOLF.fur
+  ctx.lineWidth = h * 0.07
+  ctx.beginPath()
+  ctx.ellipse(sitting ? -h * 0.1 : 0, body, h * 0.55, h * (sitting ? 0.3 : 0.22), sitting ? -0.5 : 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+  const headX = h * 0.55
+  const headY = body - h * (sitting ? 0.45 : 0.22)
+  ctx.beginPath()
+  ctx.moveTo(headX - h * 0.12, headY - h * 0.12) // ears and skull
+  ctx.lineTo(headX - h * 0.08, headY - h * 0.38)
+  ctx.lineTo(headX + h * 0.02, headY - h * 0.16)
+  ctx.lineTo(headX + h * 0.1, headY - h * 0.36)
+  ctx.lineTo(headX + h * 0.17, headY - h * 0.08)
+  ctx.lineTo(headX + h * 0.42, headY + h * 0.02) // snout
+  ctx.lineTo(headX + h * 0.12, headY + h * 0.16)
+  ctx.lineTo(headX - h * 0.16, headY + h * 0.1)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = WOLF.eye
+  ctx.beginPath()
+  ctx.arc(headX + h * 0.08, headY - h * 0.02, h * 0.04, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+  ctx.lineCap = 'butt'
+}
+
+// Three claw marks across a squad that has just been bitten
+export function drawClaws(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  ctx.lineCap = 'round'
+  for (const [color, width] of [[WOLF.dark, 0.07], [CLAW, 0.035]] as const) {
+    ctx.strokeStyle = color
+    ctx.lineWidth = size * width
+    ctx.beginPath()
+    for (const offset of [-0.12, 0, 0.12]) {
+      ctx.moveTo(x + (offset - 0.1) * size, y - 0.16 * size)
+      ctx.quadraticCurveTo(x + offset * size, y - 0.02 * size, x + (offset + 0.1) * size, y + 0.14 * size)
+    }
+    ctx.stroke()
+  }
   ctx.lineCap = 'butt'
 }
 

@@ -1,5 +1,6 @@
 import { readStored, store } from '../storage'
 import type { SoundEvent } from './events'
+import { loadRecordings, playRecording } from './recordings'
 
 const SOUND_KEY = 'wayfold.sound'
 const VOLUME_KEY = 'wayfold.volume'
@@ -73,6 +74,7 @@ class Sounds {
       effects.connect(output)
       this.audio = { context, output, effects, noise: whiteNoise(context) }
       this.applyVolume()
+      loadRecordings(context)
       // A hidden tab stops the game, so the sound waits for it too
       document.addEventListener('visibilitychange', () => {
         void (document.hidden ? context.suspend() : context.resume())
@@ -138,6 +140,9 @@ const RECIPES: Record<SoundEvent, (audio: Audio, time: number) => void> = {
     ;[1, 2.76, 5.4].forEach((ratio, i) =>
       tone(audio, time, { from: 440 * ratio, length: 1.6 / (i + 1), volume: 0.2 / (i + 1) }))
   },
+  // Wolves: real recordings
+  howl: (audio, time) => playRecording(audio.context, audio.effects, 'howl', time, 0.35),
+  growl: (audio, time) => playRecording(audio.context, audio.effects, 'growl', time, 0.45),
   victory: (audio, time) => melody(audio, time, [NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6], 0.14),
   defeat: (audio, time) => melody(audio, time, [NOTE.G4, NOTE.Eb4, NOTE.C4], 0.28),
 }

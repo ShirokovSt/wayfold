@@ -62,3 +62,8 @@ export const STONE = { main: '#b4aca0', dark: '#6e665b' }
 export const FARM = { soil: '#9a6b43', wheat: '#e3c25a', hay: '#e8c35c', hayDark: '#9c7a2a' }
 export const SANDBAR = { sand: '#dcc58e', edge: '#b39b62', pebble: '#9c8f74' }
 export const SHADOW = 'rgba(40, 25, 10, 0.25)'
+// Wolves and their dens: grey fur, and the wild land around a den in a dark shade
+export const WOLF = { fur: '#8f8a82', dark: '#45413c', belly: '#cfc8bb', eye: '#f2c14e' }
+export const WILD_TONE: Tone = { main: '#8f8a82', dark: '#45413c', light: '#ebe6dc' }
+export const WILD_LAND = 'rgba(40, 45, 25, 0.22)'
+export const CLAW = '#f4eedf'

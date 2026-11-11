@@ -1,11 +1,16 @@
 import type { Drag } from '../input/pointer'
 import { squadSize } from '../sim/squads'
 import { ARROW_SECONDS } from '../sim/towers'
-import { type Cell, HUMAN, type Squad, type World } from '../sim/world'
-import { drawDecor, drawEstates, drawGround, drawTable, drawTerritory, drawTowerZones, hexPath, tileCenter } from './board'
-import { TOWER_TOP, drawArrow, drawBadge, drawBuilding, drawCrown, drawPerson, drawVillage } from './figures'
+import { BITE_SECONDS } from '../sim/beasts'
+import { type Bite, type Cell, HUMAN, type Pack, type Squad, type World } from '../sim/world'
+import {
+  drawDecor, drawEstates, drawGround, drawTable, drawTerritory, drawTowerZones, drawWildLand, hexPath, tileCenter,
+} from './board'
+import {
+  TOWER_TOP, drawArrow, drawBadge, drawBuilding, drawClaws, drawCrown, drawLair, drawPerson, drawVillage, drawWolf,
+} from './figures'
 import { Layout } from './layout'
-import { GOLD, ownerTone } from './palette'
+import { GOLD, WILD_TONE, ownerTone } from './palette'
 
 // Where the walkers of a squad stand around its position, in tile sizes; at most this many are drawn
 const FORMATION = [
@@ -83,6 +88,7 @@ export class Renderer {
     const hovered = view.hover?.village
     drawEstates(ctx, this.world, this.layout, hovered?.owner === HUMAN ? hovered : null)
     drawTowerZones(ctx, this.world, this.layout, view.hover)
+    drawWildLand(ctx, this.world.map, this.layout)
     ctx.drawImage(this.decor, 0, 0, this.width, this.height)
     if (view.selected) {
       ctx.lineWidth = size * 0.08
@@ -111,8 +117,17 @@ export class Renderer {
       drawVillage(ctx, x, y, size, ownerTone(village.owner), time, village.town)
       if (village.capital) drawCrown(ctx, x - size * 0.05, y - size * 0.5, size, time)
     }
-    const squads = [...this.world.squads].sort((a, b) => a.y - b.y)
-    for (const squad of squads) this.drawSquad(squad, alpha, time)
+    for (const lair of this.world.lairs) {
+      const { x, y } = tileCenter(this.layout, lair.cell)
+      drawLair(ctx, x, y, size, time)
+    }
+    // Squads and packs together, the lower ones in front
+    const walkers = [...this.world.squads, ...this.world.packs].sort((a, b) => a.y - b.y)
+    for (const walker of walkers) {
+      if ('owner' in walker) this.drawSquad(walker, alpha, time)
+      else this.drawPack(walker, alpha, time)
+    }
+    for (const bite of this.world.bites) this.drawBite(bite, alpha, time)
     for (const arrow of this.world.arrows) {
       const from = this.layout.toScreen(arrow.from.x, arrow.from.y)
       from.y -= size * TOWER_TOP
@@ -121,6 +136,10 @@ export class Renderer {
     for (const village of this.world.villages) {
       const { x, y } = tileCenter(this.layout, village.cell)
       drawBadge(ctx, x, y + size * 0.55, String(Math.floor(village.population)), size, ownerTone(village.owner))
+    }
+    for (const lair of this.world.lairs) {
+      const { x, y } = tileCenter(this.layout, lair.cell)
+      drawBadge(ctx, x, y + size * 0.55, String(Math.floor(lair.pack)), size, WILD_TONE)
     }
     if (view.drag) this.drawLeaving(view.drag)
   }
@@ -152,6 +171,37 @@ export class Renderer {
       drawPerson(this.ctx, x + spot.x * size, y + spot.y * size + size * 0.15, size, tone, phase, squad.strength > 1)
     })
     if (squad.count > 1) drawBadge(this.ctx, x, y - size * 0.38, String(squad.count), size * 0.8, tone)
+  }
+
+  // Wolves run in a looser bunch than people, facing the way they go
+  private drawPack(pack: Pack, alpha: number, time: number): void {
+    const size = this.layout.size
+    const { x, y } = this.layout.toScreen(pack.prevX + (pack.x - pack.prevX) * alpha, pack.prevY + (pack.y - pack.prevY) * alpha)
+    const facing = pack.x < pack.prevX ? -1 : 1
+    const runners = FORMATION.slice(0, pack.count).sort((a, b) => a.y - b.y)
+    runners.forEach((spot, i) => {
+      const phase = time * 12 + i * 1.3 + pack.id
+      drawWolf(this.ctx, x + spot.x * size * 1.2, y + spot.y * size + size * 0.15, size * 0.8, phase, facing)
+    })
+    drawBadge(this.ctx, x, y - size * 0.32, String(pack.count), size * 0.8, WILD_TONE)
+  }
+
+  // A wolf bounds out of the den to the squad in a few leaps, slashes at it and runs back
+  private drawBite(bite: Bite, alpha: number, time: number): void {
+    const size = this.layout.size
+    const squad = bite.squad
+    const to = this.layout.toScreen(squad.prevX + (squad.x - squad.prevX) * alpha, squad.prevY + (squad.y - squad.prevY) * alpha)
+    const from = this.layout.toScreen(bite.from.x, bite.from.y)
+    const half = BITE_SECONDS / 2
+    const out = bite.age < half
+    const k = out ? bite.age / half : 1 - (bite.age - half) / half // 0 at the den, 1 at the squad
+    const reach = 0.82 // it stops just short of the walkers
+    const x = from.x + (to.x - from.x) * k * reach
+    const leap = Math.abs(Math.sin(k * Math.PI * 2)) * size * 0.18
+    const y = from.y + (to.y - from.y) * k * reach + size * 0.2 - leap
+    const facing = (to.x - from.x) * (out ? 1 : -1) >= 0 ? 1 : -1
+    drawWolf(this.ctx, x, y, size * 0.9, time * 16, facing)
+    if (Math.abs(bite.age - half) < 0.12) drawClaws(this.ctx, to.x, to.y - size * 0.05, size)
   }
 
   // Where your squads are heading: from their current spot along the rest of the path

@@ -1,9 +1,10 @@
 import { hexDistance } from '../core/hex'
 import type { GameMap } from './map'
-import { SQUAD_SPEED, isPassable, moveCost } from './rules'
+import { SQUAD_SPEED, WILD_PATH_COST, isPassable, moveCost } from './rules'
 import type { Cell } from './world'
 
-// A* search for the quickest way; other villages are in the way, only the goal can be one
+// A* search for the quickest way; other villages and dens are in the way, only the goal can be one.
+// Wild land counts extra, so routes go around it unless that is a long way
 export function findPath(map: GameMap, from: Cell, to: Cell): Cell[] | null {
   if (!isPassable(to)) return null
   const cost = new Map<Cell, number>([[from, 0]])
@@ -25,8 +26,8 @@ export function findPath(map: GameMap, from: Cell, to: Cell): Cell[] | null {
     open.delete(current)
 
     for (const next of map.neighbors(current)) {
-      if (!isPassable(next) || (next.village && next !== to)) continue
-      const nextCost = cost.get(current)! + moveCost(map.season, next.terrain)
+      if (!isPassable(next) || ((next.village || next.lair) && next !== to)) continue
+      const nextCost = cost.get(current)! + moveCost(map.season, next.terrain) + (next.wild ? WILD_PATH_COST : 0)
       if (nextCost < (cost.get(next) ?? Infinity)) {
         cost.set(next, nextCost)
         cameFrom.set(next, current)

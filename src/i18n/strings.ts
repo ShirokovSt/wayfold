@@ -1,6 +1,6 @@
 import type { Difficulty } from '../ai/rival'
 import type { Project } from '../sim/economy'
-import type { MapSize, MapType, Season } from '../sim/world'
+import type { Beasts, MapSize, MapType, Season } from '../sim/world'
 import type { StepId } from '../tutorial/tutorial'
 
 export const en = {
@@ -25,6 +25,14 @@ export const en = {
   } satisfies Record<Season, string>,
   difficulty: 'Rival',
   difficulties: { easy: 'Easy', normal: 'Normal', hard: 'Hard' } satisfies Record<Difficulty, string>,
+  beasts: 'Wolves',
+  beastLevels: { none: 'None', few: 'Few', many: 'Many' } satisfies Record<Beasts, string>,
+  beastRules: 'About wolves',
+  beastHints: [
+    "Wolves live in dens. Nobody can own the wild land around a den, and wolves bite squads walking through it.",
+    'Send a squad at a den: if it beats the pack, the den is gone and you get its land and 40 gold.',
+    'Now and then a pack runs at the nearest village and kills some of its people. In winter they are hungrier.',
+  ],
   zoomIn: 'Zoom in (+)',
   zoomOut: 'Zoom out (−)',
   wholeMap: 'Whole map (0)',
@@ -113,6 +121,14 @@ export const ru: Strings = {
   },
   difficulty: 'Соперник',
   difficulties: { easy: 'Лёгкий', normal: 'Обычный', hard: 'Сильный' },
+  beasts: 'Волки',
+  beastLevels: { none: 'Нет', few: 'Мало', many: 'Много' },
+  beastRules: 'О волках',
+  beastHints: [
+    'Волки живут в логовах. Дикую землю вокруг логова нельзя занять, а отряды, идущие через неё, волки кусают.',
+    'Отправьте отряд на логово: если он сильнее стаи, логово разорено, а вам достаются его земля и 40 золота.',
+    'Время от времени стая бежит к ближайшей деревне и убивает часть жителей. Зимой волки голоднее.',
+  ],
   zoomIn: 'Приблизить (+)',
   zoomOut: 'Отдалить (−)',
   wholeMap: 'Вся карта (0)',

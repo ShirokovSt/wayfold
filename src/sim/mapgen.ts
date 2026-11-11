@@ -1,12 +1,16 @@
 import { type Hex, addHex, hexDistance, hexLine, hexToPoint } from '../core/hex'
 import { createNoise } from '../core/noise'
 import { type Random, createRandom, pick, randomInt } from '../core/rng'
+import { makeLair } from './beasts'
 import { GameMap } from './map'
 import { findPath } from './pathfind'
 import {
+  LAIR_COUNT,
+  LAIR_GAP,
   LAND_PER_VILLAGE,
   MAP_DIMENSIONS,
   NEUTRAL_GARRISON,
+  PACK_SIZE,
   START_LAND_RADIUS,
   START_POPULATION,
   VILLAGE_PAIRS,
@@ -14,8 +18,10 @@ import {
 } from './rules'
 import { claimAround } from './territory'
 import {
+  type Beasts,
   type Cell,
   HUMAN,
+  type Lair,
   MAP_TYPES,
   type MapSize,
   type MapType,
@@ -32,9 +38,10 @@ export interface MapSettings {
   size: MapSize
   type: MapType | 'random'
   season?: Season | 'random' // summer when left out
+  beasts?: Beasts // none when left out
 }
 
-export const DEFAULT_SETTINGS: MapSettings = { size: 'medium', type: 'random', season: 'random' }
+export const DEFAULT_SETTINGS: MapSettings = { size: 'medium', type: 'random', season: 'random', beasts: 'few' }
 
 // Each map type is a share of land and a "bias" that raises or lowers the land by position:
 // u and v go from -1 to 1 across the map, the players start near u = -0.7 and u = 0.7
@@ -57,13 +64,13 @@ export function createWorld(seed: number, settings: MapSettings = DEFAULT_SETTIN
   const type = settings.type === 'random' ? pick(createRandom(seed), MAP_TYPES) : settings.type
   const season = settings.season === 'random' ? pick(createRandom(seed + 1), SEASONS) : (settings.season ?? 'summer')
   for (let attempt = 0; attempt < 100; attempt++) {
-    const world = tryCreateWorld(seed + attempt * 7919, settings.size, type, season)
+    const world = tryCreateWorld(seed + attempt * 7919, settings.size, type, season, settings.beasts ?? 'none')
     if (world) return world
   }
   throw new Error(`No playable map near seed ${seed}`)
 }
 
-function tryCreateWorld(seed: number, size: MapSize, type: MapType, season: Season): World | null {
+function tryCreateWorld(seed: number, size: MapSize, type: MapType, season: Season, beasts: Beasts): World | null {
   const random = createRandom(seed)
   const { width, height } = MAP_DIMENSIONS[size]
   const map = new GameMap(width, height)
@@ -76,10 +83,37 @@ function tryCreateWorld(seed: number, size: MapSize, type: MapType, season: Seas
 
   const villages = placeVillages(map, random)
   if (!villages || !allReachable(map, villages)) return null
+  // Dens have their own random numbers, so turning beasts on or off leaves the rest of the map as it was
+  const lairs = beasts === 'none' ? [] : placeLairs(map, villages, LAIR_COUNT[size][beasts], createRandom(seed + 104729))
   // The season comes last, so the same seed gives the same map in every season
   map.season = season
   if (season === 'winter') freezeInlandWater(map, [...river, ...river.map((cell) => map.mirror(cell))])
-  return newWorld(map, villages, type)
+  return newWorld(map, villages, type, lairs)
+}
+
+// Wolves' dens in mirrored pairs, away from the villages and from each other, preferably in the woods.
+// On a crowded map a den may stand closer to a neutral village, never to a capital:
+// the wild land must stay off the land the players start with
+function placeLairs(map: GameMap, villages: Village[], count: number, random: Random): Lair[] {
+  const lairs: Lair[] = []
+  const land = shuffle(map.cells.filter((cell) => (cell.terrain === 'field' || cell.terrain === 'forest') && !cell.village), random)
+  const farEnough = (cell: Cell, gap: number) =>
+    villages.every((village) => hexDistance(village.cell.hex, cell.hex) >= (village.capital ? LAIR_GAP : gap)) &&
+    lairs.every((lair) => hexDistance(lair.cell.hex, cell.hex) >= 3) &&
+    hexDistance(cell.hex, map.mirror(cell).hex) >= 3
+  const findSpot = (gap: number) =>
+    land
+      .filter((cell) => !cell.lair && farEnough(cell, gap))
+      .sort((a, b) => Number(b.terrain === 'forest') - Number(a.terrain === 'forest'))
+      .slice(0, 30) // enough tries; checking every tile for blocked ways would be slow
+      .find((cell) => findPath(map, villages[0].cell, cell) !== null && !blocksWay(map, villages, cell))
+  for (let pair = 0; pair < count / 2; pair++) {
+    const spot = findSpot(LAIR_GAP) ?? findSpot(LAIR_GAP - 1) ?? findSpot(LAIR_GAP - 2)
+    if (!spot) break
+    const size = randomInt(random, PACK_SIZE.min, PACK_SIZE.max)
+    lairs.push(makeLair(map, spot, pair, size), makeLair(map, map.mirror(spot), pair, size))
+  }
+  return lairs
 }
 
 // Rivers and lakes freeze over, the sea does not: lakes are water that does not reach the map edge
@@ -208,6 +242,24 @@ function placeVillages(map: GameMap, random: Random): Village[] | null {
   }
   for (const village of villages.slice(0, 2)) claimAround(map, village, START_LAND_RADIUS)
   return villages
+}
+
+// The same cells in a random order (Fisher–Yates)
+function shuffle<T>(items: T[], random: Random): T[] {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = randomInt(random, 0, i)
+    ;[items[i], items[j]] = [items[j], items[i]]
+  }
+  return items
+}
+
+// A den is in the way like a village: it must not stand in the only pass to a village
+function blocksWay(map: GameMap, villages: Village[], cell: Cell): boolean {
+  const spots = [cell, map.mirror(cell)]
+  for (const spot of spots) spot.village = villages[0] // just for the check: something paths go around
+  const blocked = !allReachable(map, villages)
+  for (const spot of spots) spot.village = null
+  return blocked
 }
 
 // Villages block paths, so check each one can actually be marched to from the capital

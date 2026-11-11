@@ -54,6 +54,25 @@ export const TOWER_RANGE = 2 // tiles it shoots and guards: only soldiers can ta
 export const TOWER_RELOAD = 1 // seconds between volleys
 export const TOWER_VOLLEY = 0.1 // share of the squad a volley takes, at least one person
 
+// Wolves: dens in mirrored pairs, wild land around them, raids now and then
+export const LAIR_COUNT: Record<MapSize, Record<'few' | 'many', number>> = {
+  small: { few: 2, many: 4 },
+  medium: { few: 4, many: 6 },
+  large: { few: 6, many: 10 },
+}
+export const LAIR_GAP = 4 // tiles from any village, so the wild land never touches one
+export const PACK_SIZE = { min: 14, max: 22 } // wolves in a den at the start, and the most it holds
+export const PACK_GROWTH = 0.05 // wolves per second a den grows back
+export const WILD_RADIUS = 1
+export const WILD_PATH_COST = 2 // routes go around wild land: a step there counts this much extra
+export const WILD_BITE = 1.5 // seconds between bites at squads in the wild land...
+export const WILD_BITE_SHARE = 0.1 // ...each taking this share of the squad, at least one person
+export const LAIR_BOUNTY = 40 // gold for clearing a den
+export const FIRST_RAID = 60 // seconds before the first raid
+export const RAID_EVERY: Record<Season, number> = { summer: 90, autumn: 65, winter: 40, spring: 65 } // give or take a third
+export const RAID_SIZE = { min: 3, max: 8 } // up to half the den goes
+export const PACK_SPEED = 1.2 // field tiles per second: wolves are a bit quicker than people
+
 export const START_LAND_RADIUS = 2
 export const CAPTURE_LAND_RADIUS = 1 // a captured village claims the tiles right around it
 

@@ -1,10 +1,10 @@
 import { SQRT3, hexDistance, hexToPoint } from '../core/hex'
 import { TOWER_RANGE, TOWER_RELOAD, TOWER_VOLLEY } from './rules'
-import type { Cell, PlayerId, Squad, World } from './world'
+import type { Cell, Pack, PlayerId, Squad, World } from './world'
 
 export const ARROW_SECONDS = 0.35 // how long an arrow is drawn flying
 
-// Each tower shoots volleys at the nearest enemy squad in range; big squads lose more per volley
+// Each tower shoots volleys at the nearest enemy squad or wolf pack in range; big ones lose more per volley
 export function fireTowers(world: World, dt: number): void {
   for (const arrow of world.arrows) arrow.age += dt
   world.arrows = world.arrows.filter((arrow) => arrow.age < ARROW_SECONDS)
@@ -16,12 +16,13 @@ export function fireTowers(world: World, dt: number): void {
     if (tower.reload > 0) continue
 
     const from = hexToPoint(cell.hex, 1)
-    let target: Squad | null = null
+    let target: Squad | Pack | null = null
     let bestDistance = TOWER_RANGE * SQRT3 + 0.1 // neighbor centers are √3 apart
-    for (const squad of world.squads) {
-      const distance = Math.hypot(squad.x - from.x, squad.y - from.y)
-      if (squad.owner !== cell.owner && squad.count > 0 && distance < bestDistance) {
-        target = squad
+    const enemies = [...world.squads.filter((squad) => squad.owner !== cell.owner), ...world.packs]
+    for (const enemy of enemies) {
+      const distance = Math.hypot(enemy.x - from.x, enemy.y - from.y)
+      if (enemy.count > 0 && distance < bestDistance) {
+        target = enemy
         bestDistance = distance
       }
     }
@@ -31,6 +32,7 @@ export function fireTowers(world: World, dt: number): void {
     world.arrows.push({ from, to: { x: target.x, y: target.y }, age: 0 })
   }
   world.squads = world.squads.filter((squad) => squad.count > 0)
+  world.packs = world.packs.filter((pack) => pack.count > 0)
 }
 
 // Everything within a tower's range that is its owner's or nobody's is guarded:
@@ -51,7 +53,7 @@ export function isSoldiers(squad: Squad): boolean {
   return squad.strength > 1
 }
 
-// Whether the squad can repaint the tile or take the village on it
+// Whether the squad can repaint the tile or take the village on it; wild land is nobody's while its den stands
 export function canTake(world: World, squad: Squad, cell: Cell): boolean {
-  return isSoldiers(squad) || !isGuarded(world, cell, squad.owner)
+  return !cell.wild && (isSoldiers(squad) || !isGuarded(world, cell, squad.owner))
 }

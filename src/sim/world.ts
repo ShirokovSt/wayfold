@@ -38,6 +38,38 @@ export interface Cell {
   owner: Owner
   village: Village | null
   building: Building | null
+  lair: Lair | null
+  wild: boolean // next to a wolves' den: nobody can own it while the den stands, and wolves bite passers-by
+}
+
+// How many dens a new map gets
+export type Beasts = 'none' | 'few' | 'many'
+export const BEASTS: readonly Beasts[] = ['none', 'few', 'many']
+
+// A wolves' den; its pack grows back slowly and now and then runs at the nearest village
+export interface Lair {
+  readonly cell: Cell
+  readonly pair: number // a den and its mirror image share it, so both raid at the same moments
+  readonly size: number // the most wolves it holds
+  pack: number // wolves at home, fractional as it grows back
+  raidIn: number // seconds until the next raid
+  raids: number
+}
+
+// Wolves on a raid, or on their way back to the den
+export interface Pack {
+  readonly id: number
+  readonly lair: Lair
+  count: number
+  path: Cell[]
+  step: number
+  progress: number
+  returning: boolean
+  // Position in hex radii, like a squad's
+  x: number
+  y: number
+  prevX: number
+  prevY: number
 }
 
 export interface Village {
@@ -67,6 +99,14 @@ export interface Squad {
   prevY: number
 }
 
+// A wolf leaping out of its den at a squad in the wild land: the bite lands halfway, then it runs back
+export interface Bite {
+  readonly from: Point // the den
+  readonly squad: Squad
+  age: number // seconds since it leapt
+  hit: boolean
+}
+
 // A tower's arrow in flight, kept only for drawing
 export interface Arrow {
   readonly from: Point
@@ -79,15 +119,22 @@ export interface World {
   readonly mapType: MapType
   readonly villages: Village[]
   squads: Squad[]
+  lairs: Lair[]
+  packs: Pack[]
   gold: Record<PlayerId, number>
   arrows: Arrow[]
+  bites: Bite[]
   time: number // seconds since the match started
+  biteIn: number // seconds until wolves bite squads in the wild land again
   winner: PlayerId | null
   nextId: number
 }
 
-export function newWorld(map: GameMap, villages: Village[], mapType: MapType = 'continent'): World {
-  return { map, mapType, villages, squads: [], gold: { 0: 0, 1: 0 }, arrows: [], time: 0, winner: null, nextId: 0 }
+export function newWorld(map: GameMap, villages: Village[], mapType: MapType = 'continent', lairs: Lair[] = []): World {
+  return {
+    map, mapType, villages, squads: [], lairs, packs: [], gold: { 0: 0, 1: 0 }, arrows: [], bites: [], time: 0, biteIn: 0,
+    winner: null, nextId: 0,
+  }
 }
 
 export function opponent(player: PlayerId): PlayerId {

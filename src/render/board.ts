@@ -5,7 +5,9 @@ import { estateTiles, estateVillage } from '../sim/estates'
 import { TOWER_RANGE } from '../sim/rules'
 import type { Cell, Season, Village, World } from '../sim/world'
 import { type Layout, TILE_DEPTH } from './layout'
-import { FLOWERS, GRASS, LEAVES, PUDDLE, ROCK, SANDBAR, SHADOW, SNOW, TABLE, TERRAIN, WOOD, ownerTone } from './palette'
+import {
+  FLOWERS, GRASS, LEAVES, PUDDLE, ROCK, SANDBAR, SHADOW, SNOW, TABLE, TERRAIN, WILD_LAND, WILD_TONE, WOOD, ownerTone,
+} from './palette'
 
 const FACE = 0.93 // top face radius in tile sizes, the rest is the gap between tiles
 const BORDER = 0.8 // where the border line runs, inside the tile
@@ -389,6 +391,33 @@ export function drawTowerZones(ctx: CanvasRenderingContext2D, world: World, layo
         ctx.lineTo(b.x, b.y)
       })
     }
+    ctx.stroke()
+  }
+  ctx.setLineDash([])
+  ctx.lineCap = 'butt'
+}
+
+// Wild land around the dens: a dark shade and a ragged dotted edge, like a tower's zone
+export function drawWildLand(ctx: CanvasRenderingContext2D, map: GameMap, layout: Layout): void {
+  const size = layout.size
+  ctx.fillStyle = WILD_LAND
+  ctx.setLineDash([size * 0.01, size * 0.13])
+  ctx.lineCap = 'round'
+  ctx.lineWidth = size * 0.08
+  ctx.strokeStyle = WILD_TONE.dark
+  for (const cell of map.cells) {
+    if (!cell.wild) continue
+    const center = tileCenter(layout, cell)
+    hexPath(ctx, center, size * FACE * 0.97)
+    ctx.fill()
+    ctx.beginPath()
+    DIRECTIONS.forEach((direction, i) => {
+      if (map.cellAt(addHex(cell.hex, direction))?.wild) return
+      const a = hexCorner(center, size * 0.86, i)
+      const b = hexCorner(center, size * 0.86, i + 1)
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x, b.y)
+    })
     ctx.stroke()
   }
   ctx.setLineDash([])

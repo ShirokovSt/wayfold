@@ -4,7 +4,7 @@ import { sounds } from '../audio/sounds'
 import { onLanguageChange, t } from '../i18n'
 import { DIFFICULTIES } from '../ai/rival'
 import type { MatchSettings } from '../game'
-import { MAP_SIZES, MAP_TYPES, SEASONS } from '../sim/world'
+import { BEASTS, MAP_SIZES, MAP_TYPES, SEASONS } from '../sim/world'
 import { button, element } from './dom'
 import { formatTime } from './hud'
 import { languageSelect } from './languageSelect'
@@ -14,6 +14,8 @@ export interface MatchChoice {
   current(): MatchSettings
   change(settings: MatchSettings): void
 }
+
+type Help = 'season' | 'beasts'
 
 export interface MenuActions {
   newMap(): void
@@ -26,7 +28,7 @@ export interface MenuActions {
 // Cards over the board: the menu, the new map card and the end of the match
 export class Screens {
   private content: (() => HTMLElement) | null = null
-  private seasonHelpOpen = false
+  private helpOpen: Help | null = null
   private onEscape: (() => void) | null = null
 
   constructor(private readonly root: HTMLElement) {
@@ -137,14 +139,18 @@ export class Screens {
       choice.change(next)
       this.refresh()
     }
-    // The seasons' rules open under their row from a "?", so the card stays light
-    const help = button('?', () => {
-      this.seasonHelpOpen = !this.seasonHelpOpen
-      this.refresh()
-    }, `help${this.seasonHelpOpen ? ' active' : ''}`)
-    help.title = t().seasonRules
+    // The rules of seasons and of wolves open under their row from a "?", so the card stays light
+    const help = (topic: Help, title: string) => {
+      const node = button('?', () => {
+        this.helpOpen = this.helpOpen === topic ? null : topic
+        this.refresh()
+      }, `help${this.helpOpen === topic ? ' active' : ''}`)
+      node.title = title
+      return node
+    }
     const seasonRules = element('div', 'season-rules',
       ...SEASONS.map((season) => element('p', '', element('b', '', t().seasons[season]), ` — ${t().seasonHints[season]}`)))
+    const beastRules = element('div', 'season-rules', ...t().beastHints.map((hint) => element('p', '', hint)))
     return element(
       'div',
       'choices',
@@ -152,9 +158,12 @@ export class Screens {
         [t().mapTypes[type], settings.type === type, () => choose({ ...settings, type })])),
       choiceRow(t().mapSize, MAP_SIZES.map((size) =>
         [t().mapSizes[size], settings.size === size, () => choose({ ...settings, size })])),
-      choiceRow([t().season, help], (['random', ...SEASONS] as const).map((season) =>
+      choiceRow([t().season, help('season', t().seasonRules)], (['random', ...SEASONS] as const).map((season) =>
         [t().seasons[season], settings.season === season, () => choose({ ...settings, season })])),
-      ...(this.seasonHelpOpen ? [seasonRules] : []),
+      ...(this.helpOpen === 'season' ? [seasonRules] : []),
+      choiceRow([t().beasts, help('beasts', t().beastRules)], BEASTS.map((beasts) =>
+        [t().beastLevels[beasts], settings.beasts === beasts, () => choose({ ...settings, beasts })])),
+      ...(this.helpOpen === 'beasts' ? [beastRules] : []),
       choiceRow(t().difficulty, DIFFICULTIES.map((difficulty) =>
         [t().difficulties[difficulty], settings.difficulty === difficulty, () => choose({ ...settings, difficulty })])),
     )
