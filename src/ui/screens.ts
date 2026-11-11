@@ -89,7 +89,7 @@ export class Screens {
     )
   }
 
-  end(won: boolean, seconds: number, onNewMap: () => void, onMenu: () => void): void {
+  end(won: boolean, seconds: number, onNewMap: () => void, onMenu: () => void, onWatch: () => void): void {
     this.show(null, () =>
       element(
         'div',
@@ -97,7 +97,13 @@ export class Screens {
         element('h2', '', won ? t().victory : t().defeat),
         element('p', '', won ? t().victoryText : t().defeatText),
         element('p', 'muted', `${t().matchTime}: ${formatTime(seconds)}`),
-        element('div', 'actions centered', button(t().newMap, onNewMap, 'primary'), button(t().toMenu, onMenu)),
+        element(
+          'div',
+          'actions centered',
+          button(t().newMap, onNewMap, 'primary'),
+          button(t().watchReplay, onWatch),
+          button(t().toMenu, onMenu),
+        ),
       ),
     )
   }

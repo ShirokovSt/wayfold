@@ -60,6 +60,12 @@ export class Renderer {
     this.layersStale = true
   }
 
+  // The same match at another moment, e.g. in a replay: the camera stays where it is
+  showWorld(world: World): void {
+    this.world = world
+    this.layersStale = true
+  }
+
   cameraMoved(): void {
     this.layersStale = true
   }
@@ -116,7 +122,8 @@ export class Renderer {
     for (const village of this.world.villages) {
       const { x, y } = tileCenter(this.layout, village.cell)
       drawVillage(ctx, x, y, size, ownerTone(village.owner), time, village.town)
-      if (village.capital) drawCrown(ctx, x - size * 0.05, y - size * 0.5, size, time)
+      // Over a town the crown floats above the keep's pennant, so it hides none of the castle
+      if (village.capital) drawCrown(ctx, x - size * (village.town ? 0 : 0.05), y - size * (village.town ? 0.95 : 0.5), size, time)
     }
     for (const lair of this.world.lairs) {
       const { x, y } = tileCenter(this.layout, lair.cell)

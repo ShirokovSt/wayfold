@@ -42,6 +42,7 @@ export function build(world: World, player: PlayerId, cell: Cell, kind: Building
   if (!canBuild(world, player, cell, kind) || world.gold[player] < cost) return false
   world.gold[player] -= cost
   cell.building = { kind, reload: 0 }
+  world.orders.push({ at: world.ticks, player, kind: 'build', cell: cell.index, building: kind })
   return true
 }
 
@@ -53,5 +54,6 @@ export function upgradeToTown(world: World, player: PlayerId, village: Village):
   if (!canUpgrade(player, village) || world.gold[player] < TOWN_COST) return false
   world.gold[player] -= TOWN_COST
   village.town = true
+  world.orders.push({ at: world.ticks, player, kind: 'town', village: village.cell.index })
   return true
 }

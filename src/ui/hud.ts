@@ -6,7 +6,8 @@ import { HUMAN, PLAYERS, type PlayerId, type Season, type World } from '../sim/w
 import { button, element } from './dom'
 import { withHint } from './hint'
 
-const SPEEDS = [0.5, 1, 2]
+const SPEEDS = [0.5, 1, 2, 4, 8]
+export const PLAY_SPEED_LIMIT = 2 // faster speeds are only for watching a replay
 const SEASON_ICONS: Record<Season, string> = { summer: '☀', autumn: '🍂', winter: '❄', spring: '🌱' }
 
 type Stat = 'villages' | 'people' | 'land' | 'gold'
@@ -19,8 +20,8 @@ const ICONS: Record<Stat, string> = {
   gold: '<circle cx="8" cy="8" r="5.6" fill="#f2c14e" stroke="#8a6514" stroke-width="1.5"/>',
 }
 const MENU_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="12" height="2" rx="1"/><rect x="2" y="11" width="12" height="2" rx="1"/></svg>'
-const PAUSE_ICON ='<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>'
-const PLAY_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2.5v11l9-5.5z"/></svg>'
+export const PAUSE_ICON ='<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>'
+export const PLAY_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2.5v11l9-5.5z"/></svg>'
 // A speaker with sound waves, or crossed out when muted
 const SPEAKER = '<path d="M1.5 6h3l4-3.5v11l-4-3.5h-3z"/>'
 const LINE = 'fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"'
@@ -73,7 +74,10 @@ export class Hud {
     const resumes = this.game.paused && this.game.started
     setIcon(this.pauseButton, resumes ? PLAY_ICON : PAUSE_ICON, resumes ? t().resume : t().pause)
     setIcon(this.soundButton, sounds.muted ? MUTED_ICON : SOUND_ICON, sounds.muted ? t().soundOn : t().soundOff)
-    SPEEDS.forEach((speed, i) => this.speedButtons[i].classList.toggle('active', speed === this.game.speed))
+    SPEEDS.forEach((speed, i) => {
+      this.speedButtons[i].classList.toggle('active', speed === this.game.speed)
+      this.speedButtons[i].hidden = speed > PLAY_SPEED_LIMIT && !this.game.watching
+    })
   }
 
   private build(): void {

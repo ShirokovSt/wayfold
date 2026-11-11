@@ -100,6 +100,10 @@ export const en = {
   victoryText: 'Every village flies your flag.',
   defeatText: 'Your last village has fallen.',
   matchTime: 'Match time',
+  watchReplay: 'Watch the replay',
+  replay: 'Replay',
+  replayTime: 'Move to a moment of the match',
+  toResults: 'Back to the result (Esc)',
   toMenu: 'Menu',
 }
 
@@ -200,5 +204,9 @@ export const ru: Strings = {
   victoryText: 'Над каждой деревней ваш флаг.',
   defeatText: 'Ваша последняя деревня пала.',
   matchTime: 'Время партии',
+  watchReplay: 'Смотреть запись',
+  replay: 'Запись',
+  replayTime: 'Перейти к моменту партии',
+  toResults: 'К итогам (Esc)',
   toMenu: 'В меню',
 }

@@ -8,21 +8,36 @@ import { CLAW, FARM, GOLD, ROCK, SHADOW, STEEL, STONE, type Tone, WOLF, WOOD } f
 export function drawVillage(
   ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number, town = false,
 ): void {
-  ellipse(ctx, x, y + size * 0.1, size * (town ? 0.6 : 0.44), size * (town ? 0.26 : 0.17), SHADOW)
-  if (town) drawWall(ctx, x, y, size)
+  if (town) {
+    drawTown(ctx, x, y, size, tone, time)
+    return
+  }
+  ellipse(ctx, x, y + size * 0.1, size * 0.44, size * 0.17, SHADOW)
   drawFlag(ctx, x + size * 0.4, y - size * 0.02, size, tone, time)
-  if (town) drawKeep(ctx, x - size * 0.33, y - size * 0.02, size, tone)
   drawHouse(ctx, x - size * 0.25, y - size * 0.1, size * 0.33, tone)
   drawHouse(ctx, x + size * 0.17, y - size * 0.17, size * 0.3, tone)
   drawHouse(ctx, x - size * 0.02, y + size * 0.18, size * 0.4, tone)
 }
 
-// A low round wall: its front face, the top and battlements along the front edge
-function drawWall(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-  const cy = y + size * 0.05
-  const rx = size * 0.56
-  const ry = size * 0.25
-  const h = size * 0.1
+// A town is a small stone castle, so it reads apart from the wooden village even on a big map:
+// a wall all round, a tall keep with a pennant in the middle and a tower at each front corner
+function drawTown(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number): void {
+  ellipse(ctx, x, y + size * 0.14, size * 0.66, size * 0.3, SHADOW)
+  const cy = y + size * 0.04
+  drawWall(ctx, x, cy, size * 0.58, size * 0.25, size * 0.16, size)
+  const keepTop = y - size * 0.42
+  drawFlag(ctx, x, keepTop - size * 0.24, size, tone, time, 0.24)
+  drawTurret(ctx, x, y - size * 0.02, keepTop, size * 0.3, size, tone)
+  drawHouse(ctx, x - size * 0.28, y + size * 0.04, size * 0.24, tone)
+  drawHouse(ctx, x + size * 0.28, y + size * 0.02, size * 0.22, tone)
+  for (const side of [-1, 1]) {
+    const tx = x + side * size * 0.52
+    drawTurret(ctx, tx, cy + size * 0.26, cy - size * 0.16, size * 0.2, size, tone)
+  }
+}
+
+// A round wall: its front face, the top and battlements along the front edge
+function drawWall(ctx: CanvasRenderingContext2D, x: number, cy: number, rx: number, ry: number, h: number, size: number): void {
   ctx.lineJoin = 'round'
   ctx.lineWidth = size * 0.025
   ctx.strokeStyle = STONE.dark
@@ -48,10 +63,10 @@ function drawWall(ctx: CanvasRenderingContext2D, x: number, y: number, size: num
   }
 }
 
-// A tall stone tower with a window and a pointed roof in the owner's color
-function drawKeep(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone): void {
-  const w = size * 0.2
-  const top = y - size * 0.52
+// A stone tower from its foot up to `top`, with a window and a pointed roof in the owner's color
+function drawTurret(
+  ctx: CanvasRenderingContext2D, x: number, y: number, top: number, w: number, size: number, tone: Tone,
+): void {
   ctx.lineJoin = 'round'
   ctx.lineWidth = size * 0.025
   ctx.fillStyle = STONE.main
@@ -59,10 +74,10 @@ function drawKeep(ctx: CanvasRenderingContext2D, x: number, y: number, size: num
   ctx.fillRect(x - w / 2, top, w, y - top)
   ctx.strokeRect(x - w / 2, top, w, y - top)
   ctx.fillStyle = WOOD.door
-  ctx.fillRect(x - size * 0.03, top + size * 0.08, size * 0.06, size * 0.09)
+  ctx.fillRect(x - w * 0.15, top + w * 0.4, w * 0.3, w * 0.45)
   ctx.beginPath()
   ctx.moveTo(x - w * 0.7, top)
-  ctx.lineTo(x, top - size * 0.24)
+  ctx.lineTo(x, top - w * 1.1)
   ctx.lineTo(x + w * 0.7, top)
   ctx.closePath()
   ctx.fillStyle = tone.main
@@ -93,8 +108,10 @@ function drawHouse(ctx: CanvasRenderingContext2D, x: number, y: number, width: n
   ctx.stroke()
 }
 
-function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number): void {
-  const top = y - size * 0.72
+function drawFlag(
+  ctx: CanvasRenderingContext2D, x: number, y: number, size: number, tone: Tone, time: number, pole = 0.72,
+): void {
+  const top = y - size * pole
   const wave = Math.sin(time * 4 + x) * size * 0.04
   ctx.strokeStyle = WOOD.trunk
   ctx.lineWidth = size * 0.04

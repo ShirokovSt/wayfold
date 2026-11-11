@@ -64,7 +64,7 @@ export class PointerInput {
     }
     this.drag = { villages: [], squads: [], target: null, paths: [], share: shareOf(event) }
     // Orders work during the pause too: plan calmly, then let it run
-    if (this.game.world.winner !== null || !this.gather(event)) {
+    if (this.game.watching || this.game.world.winner !== null || !this.gather(event)) {
       this.drag = null
       this.pressed = this.cellAt(event) ?? null
       this.pan = { x: event.clientX, y: event.clientY, moved: false }

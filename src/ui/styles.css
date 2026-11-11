@@ -200,7 +200,8 @@ button.primary:hover {
   border-radius: 8px 0 0 8px;
 }
 
-.speed button:last-child {
+.speed button:last-child,
+.speed button:has(+ [hidden]) {
   border-radius: 0 8px 8px 0;
 }
 
@@ -328,6 +329,39 @@ button.primary:hover {
   font-size: 18px;
   line-height: 1;
   background: rgba(74, 54, 38, 0.9);
+}
+
+/* Replay: a bar under the board with the timeline */
+
+.replay {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(640px, calc(100% - 100px));
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 3px 0 #c9b791, 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.replay[hidden] {
+  display: none;
+}
+
+.replay .timeline {
+  flex: 1;
+  min-width: 60px;
+  accent-color: var(--you);
+}
+
+.replay-time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Cards over the board */

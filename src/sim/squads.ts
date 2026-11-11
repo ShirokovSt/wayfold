@@ -30,6 +30,7 @@ export function sendSquad(world: World, player: PlayerId, from: Village, to: Cel
     home: from, start: null, x, y, prevX: x, prevY: y,
   }
   world.squads.push(squad)
+  world.orders.push({ at: world.ticks, player, kind: 'send', from: from.cell.index, to: to.index, share })
   return squad
 }
 
@@ -44,6 +45,7 @@ export function redirectSquad(world: World, player: PlayerId, squad: Squad, to: 
   squad.step = 0
   squad.progress = 0
   squad.start = { x: squad.x, y: squad.y }
+  world.orders.push({ at: world.ticks, player, kind: 'redirect', squad: squad.id, to: to.index })
   return true
 }
 

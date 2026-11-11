@@ -8,6 +8,7 @@ import { HUMAN, type PlayerId, RIVAL, type World } from './world'
 export function tick(world: World, dt: number): void {
   if (world.winner !== null) return
   world.time += dt
+  world.ticks++
   growVillages(world, dt)
   collectGold(world, dt)
   moveSquads(world, dt)

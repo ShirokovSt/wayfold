@@ -12,7 +12,8 @@ import { TICK_SECONDS } from './sim/rules'
 import { HUMAN } from './sim/world'
 import { readStored, store } from './storage'
 import { BuildMenu } from './ui/buildMenu'
-import { Hud } from './ui/hud'
+import { Hud, PLAY_SPEED_LIMIT } from './ui/hud'
+import { ReplayBar } from './ui/replayBar'
 import { Screens } from './ui/screens'
 import { TutorialPanel } from './ui/tutorialPanel'
 import { zoomButtons } from './ui/zoomButtons'
@@ -38,12 +39,15 @@ const buildMenu = new BuildMenu(stage, game, renderer.layout)
 const camera = new CameraControls(canvas, renderer.layout)
 const banner = document.querySelector<HTMLElement>('#banner')!
 const tutorial = new TutorialPanel(stage, skipTutorial)
+const replayBar = new ReplayBar(stage, game, { togglePause, seek, exit: stopWatching })
 const events = new EventWatcher()
 let endShown = false
 let pausedBeforeMenu = false
 
 input.onPress = () => buildMenu.close()
-input.onTileClick = (cell) => buildMenu.open(cell)
+input.onTileClick = (cell) => {
+  if (!game.watching) buildMenu.open(cell)
+}
 // The build menu would stay where its tile used to be, so it closes when the map moves
 const cameraMoved = () => {
   renderer.cameraMoved()
@@ -62,7 +66,14 @@ function play(): void {
 
 // The pause leaves the board open: you can still give orders, they start when the game resumes
 function togglePause(): void {
-  if (game.world.winner !== null || screens.isOpen) return
+  if (screens.isOpen) return
+  if (game.watching) {
+    const ended = game.world.winner !== null
+    if (ended) seek(0) // the replay is over: play it from the start again
+    game.paused = !ended && !game.paused
+    return
+  }
+  if (game.world.winner !== null) return
   if (game.paused) {
     play()
   } else {
@@ -95,9 +106,9 @@ function openMenu(): void {
   })
 }
 
-// A match being played: the menu over it keeps the season's music
+// A match being played or watched: the menu over it keeps the season's music
 function inMatch(): boolean {
-  return game.started && game.world.winner === null
+  return game.started && (game.watching || game.world.winner === null)
 }
 
 function continueMatch(): void {
@@ -145,7 +156,37 @@ function startMatch(): void {
   input.drag = null
   buildMenu.close()
   endShown = false
+  playSpeed()
   play()
+}
+
+// The finished match from the start, at any speed; the board can be moved and zoomed, but not ordered
+function watchReplay(): void {
+  game.watch()
+  renderer.showWorld(game.world)
+  music.play(game.world.map.season)
+  play()
+}
+
+function seek(ticks: number): void {
+  game.watch(ticks)
+  renderer.showWorld(game.world)
+}
+
+function stopWatching(): void {
+  game.stopWatching()
+  renderer.showWorld(game.world)
+  playSpeed()
+  showEnd()
+}
+
+// The fastest speeds are only for replays
+function playSpeed(): void {
+  if (game.speed > PLAY_SPEED_LIMIT) game.speed = 1
+}
+
+function showEnd(): void {
+  screens.end(game.world.winner === HUMAN, game.world.time, chooseNewMap, openMenu, watchReplay)
 }
 
 const showTexts = () => (banner.textContent = t().pausedHint)
@@ -165,6 +206,7 @@ window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     if (input.drag) input.drag = null
     else if (buildMenu.cell) buildMenu.close()
+    else if (game.watching) stopWatching()
     else openMenu()
   } else if (event.code === 'Space') {
     event.preventDefault() // otherwise Space would also press the focused button
@@ -205,6 +247,7 @@ function frame(now: number): void {
     marked: tutorial.marked(game.world),
   })
   hud.update()
+  replayBar.update()
 
   const winner = game.world.winner
   if (winner !== null && !endShown) {
@@ -213,7 +256,7 @@ function frame(now: number): void {
       tutorial.stop()
       screens.tutorialDone(chooseNewMap, openMenu)
     } else {
-      screens.end(winner === HUMAN, game.world.time, chooseNewMap, openMenu)
+      showEnd()
     }
   }
 }

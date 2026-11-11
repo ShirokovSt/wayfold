@@ -1,5 +1,6 @@
 import type { Hex, Point } from '../core/hex'
 import type { GameMap } from './map'
+import type { Share } from './squads'
 
 export type PlayerId = 0 | 1
 export const HUMAN: PlayerId = 0
@@ -125,15 +126,25 @@ export interface World {
   arrows: Arrow[]
   bites: Bite[]
   time: number // seconds since the match started
+  ticks: number // simulation steps since the match started
   biteIn: number // seconds until wolves bite squads in the wild land again
   winner: PlayerId | null
   nextId: number
+  orders: Order[] // everything the players ordered, so the match can be watched again
 }
+
+// An order and the tick it was given on; villages and tiles by their cell's index, squads by id
+export type Order = { at: number; player: PlayerId } & (
+  | { kind: 'send'; from: number; to: number; share: Share }
+  | { kind: 'redirect'; squad: number; to: number }
+  | { kind: 'build'; cell: number; building: BuildingKind }
+  | { kind: 'town'; village: number }
+)
 
 export function newWorld(map: GameMap, villages: Village[], mapType: MapType = 'continent', lairs: Lair[] = []): World {
   return {
-    map, mapType, villages, squads: [], lairs, packs: [], gold: { 0: 0, 1: 0 }, arrows: [], bites: [], time: 0, biteIn: 0,
-    winner: null, nextId: 0,
+    map, mapType, villages, squads: [], lairs, packs: [], gold: { 0: 0, 1: 0 }, arrows: [], bites: [], time: 0, ticks: 0,
+    biteIn: 0, winner: null, nextId: 0, orders: [],
   }
 }
 
