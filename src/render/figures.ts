@@ -450,18 +450,27 @@ export function drawClaws(ctx: CanvasRenderingContext2D, x: number, y: number, s
 }
 
 // A rounded label with a number, like a counter on a board game piece
-export function drawBadge(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, size: number, tone: Tone): void {
-  const height = size * 0.34
+// Pixels: on a big map zoomed out, the numbers would be too small to read. A village's number may be bigger,
+// a squad's stays smaller, so the walkers under it can still be seen
+export const VILLAGE_BADGE = 15
+export const SQUAD_BADGE = 11
+
+// A number on a little rounded plate; `dark` turns the colors around, e.g. for a squad of soldiers
+export function drawBadge(
+  ctx: CanvasRenderingContext2D, x: number, y: number, text: string, size: number, tone: Tone,
+  smallest = VILLAGE_BADGE, dark = false,
+): void {
+  const height = Math.max(size * 0.34, smallest)
   ctx.font = `700 ${Math.round(height * 0.78)}px system-ui, sans-serif`
   const width = Math.max(height * 1.3, ctx.measureText(text).width + height * 0.7)
   ctx.beginPath()
   ctx.roundRect(x - width / 2, y - height / 2, width, height, height / 2)
-  ctx.fillStyle = tone.light
-  ctx.strokeStyle = tone.dark
-  ctx.lineWidth = size * 0.04
+  ctx.fillStyle = dark ? tone.dark : tone.light
+  ctx.strokeStyle = dark ? tone.main : tone.dark
+  ctx.lineWidth = height * 0.12
   ctx.fill()
   ctx.stroke()
-  ctx.fillStyle = tone.dark
+  ctx.fillStyle = dark ? tone.light : tone.dark
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(text, x, y + height * 0.04)

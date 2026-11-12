@@ -8,7 +8,7 @@ import {
   drawDecor, drawEstates, drawGround, drawTable, drawTerritory, drawTowerZones, drawWildLand, hexPath, tileCenter,
 } from './board'
 import {
-  TOWER_TOP, drawArrow, drawBadge, drawBuilding, drawClaws, drawCrown, drawLair, drawPerson, drawVillage, drawWolf,
+  SQUAD_BADGE, TOWER_TOP, VILLAGE_BADGE, drawArrow, drawBadge, drawBuilding, drawClaws, drawCrown, drawLair, drawPerson, drawVillage, drawWolf,
 } from './figures'
 import { Layout } from './layout'
 import { GOLD, HINT, WILD_TONE, ownerTone } from './palette'
@@ -143,7 +143,9 @@ export class Renderer {
     }
     for (const village of this.world.villages) {
       const { x, y } = tileCenter(this.layout, village.cell)
-      drawBadge(ctx, x, y + size * 0.55, String(Math.floor(village.population)), size, ownerTone(village.owner))
+      // A town's people are soldiers: a dark plate, like the squads they send
+      const people = String(Math.floor(village.population))
+      drawBadge(ctx, x, y + size * 0.55, people, size, ownerTone(village.owner), VILLAGE_BADGE, village.town)
     }
     for (const lair of this.world.lairs) {
       const { x, y } = tileCenter(this.layout, lair.cell)
@@ -206,7 +208,10 @@ export class Renderer {
       const phase = time * 9 + i * 1.7 + squad.id
       drawPerson(this.ctx, x + spot.x * size, y + spot.y * size + size * 0.15, size, tone, phase, squad.strength > 1)
     })
-    if (squad.count > 1) drawBadge(this.ctx, x, y - size * 0.38, String(squad.count), size * 0.8, tone)
+    // Soldiers from a town carry a dark plate, so they are told apart from peasants even when the map is small
+    if (squad.count > 1 || squad.strength > 1) {
+      drawBadge(this.ctx, x, y - size * 0.38, String(squad.count), size * 0.8, tone, SQUAD_BADGE, squad.strength > 1)
+    }
   }
 
   // Wolves run in a looser bunch than people, facing the way they go
@@ -219,7 +224,7 @@ export class Renderer {
       const phase = time * 12 + i * 1.3 + pack.id
       drawWolf(this.ctx, x + spot.x * size * 1.2, y + spot.y * size + size * 0.15, size * 0.8, phase, facing)
     })
-    drawBadge(this.ctx, x, y - size * 0.32, String(pack.count), size * 0.8, WILD_TONE)
+    drawBadge(this.ctx, x, y - size * 0.32, String(pack.count), size * 0.8, WILD_TONE, SQUAD_BADGE)
   }
 
   // A wolf bounds out of the den to the squad in a few leaps, slashes at it and runs back
@@ -309,7 +314,7 @@ export class Renderer {
       if (village.cell === drag.target) continue
       const { x, y } = tileCenter(this.layout, village.cell)
       const count = squadSize(village.population, drag.share)
-      drawBadge(this.ctx, x, y - size * 0.95, `−${count}`, size * 0.8, ownerTone(HUMAN))
+      drawBadge(this.ctx, x, y - size * 0.95, `−${count}`, size * 0.8, ownerTone(HUMAN), SQUAD_BADGE)
     }
   }
 }

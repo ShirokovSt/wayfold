@@ -4,7 +4,10 @@ import { sounds } from '../audio/sounds'
 import { onLanguageChange, t } from '../i18n'
 import { DIFFICULTIES } from '../ai/rival'
 import type { MatchSettings } from '../game'
-import { BEASTS, MAP_SIZES, MAP_TYPES, SEASONS } from '../sim/world'
+import { MAX_RIVALS } from '../sim/rules'
+import { standings } from '../sim/tick'
+import { BEASTS, HUMAN, MAP_SIZES, MAP_TYPES, SEASONS, type World } from '../sim/world'
+import { ownerTone } from '../render/palette'
 import { button, element } from './dom'
 import { formatTime } from './hud'
 import { languageSelect } from './languageSelect'
@@ -15,7 +18,7 @@ export interface MatchChoice {
   change(settings: MatchSettings): void
 }
 
-type Help = 'season' | 'beasts'
+type Help = 'season' | 'beasts' | 'rivals'
 
 export interface MenuActions {
   newMap(): void
@@ -89,14 +92,16 @@ export class Screens {
     )
   }
 
-  end(won: boolean, seconds: number, onNewMap: () => void, onMenu: () => void, onWatch: () => void): void {
+  end(world: World, onNewMap: () => void, onMenu: () => void, onWatch: () => void): void {
+    const won = world.winner === HUMAN
     this.show(null, () =>
       element(
         'div',
         `card small ${won ? 'won' : 'lost'}`,
         element('h2', '', won ? t().victory : t().defeat),
         element('p', '', won ? t().victoryText : t().defeatText),
-        element('p', 'muted', `${t().matchTime}: ${formatTime(seconds)}`),
+        places(world),
+        element('p', 'muted', `${t().matchTime}: ${formatTime(world.time)}`),
         element(
           'div',
           'actions centered',
@@ -157,13 +162,24 @@ export class Screens {
     const seasonRules = element('div', 'season-rules',
       ...SEASONS.map((season) => element('p', '', element('b', '', t().seasons[season]), ` — ${t().seasonHints[season]}`)))
     const beastRules = element('div', 'season-rules', ...t().beastHints.map((hint) => element('p', '', hint)))
+    const rivalRules = element('div', 'season-rules', ...t().rivalHints.map((hint) => element('p', '', hint)))
+    // A smaller map takes fewer rivals: the extra ones are greyed out, and the count shrinks to fit
+    const rivals = [1, 2, 3].map((count) => {
+      const node = button(String(count), () => choose({ ...settings, rivals: count }))
+      node.classList.toggle('active', settings.rivals === count)
+      node.disabled = count > MAX_RIVALS[settings.size]
+      return node
+    })
     return element(
       'div',
       'choices',
       choiceRow(t().mapType, (['random', ...MAP_TYPES] as const).map((type) =>
         [t().mapTypes[type], settings.type === type, () => choose({ ...settings, type })])),
       choiceRow(t().mapSize, MAP_SIZES.map((size) =>
-        [t().mapSizes[size], settings.size === size, () => choose({ ...settings, size })])),
+        [t().mapSizes[size], settings.size === size, () =>
+          choose({ ...settings, size, rivals: Math.min(settings.rivals, MAX_RIVALS[size]) })])),
+      element('div', 'choice', element('span', 'label', t().rivals, help('rivals', t().rivalRules)), element('div', 'options', ...rivals)),
+      ...(this.helpOpen === 'rivals' ? [rivalRules] : []),
       choiceRow([t().season, help('season', t().seasonRules)], (['random', ...SEASONS] as const).map((season) =>
         [t().seasons[season], settings.season === season, () => choose({ ...settings, season })])),
       ...(this.helpOpen === 'season' ? [seasonRules] : []),
@@ -197,6 +213,19 @@ function volumeSlider(value: number, onChange: (volume: number) => void, onRelea
   slider.addEventListener('input', () => onChange(Number(slider.value) / 100))
   if (onRelease) slider.addEventListener('change', onRelease)
   return slider
+}
+
+// Everyone in order of their place: the winner, those still standing, then the fallen, the last to fall first
+function places(world: World): HTMLElement {
+  const rows = standings(world).map((player, i) => {
+    const out = world.out.find((entry) => entry.player === player)
+    const result = i === 0 ? t().won : out ? `${t().outAt} ${formatTime(out.time)}` : t().standing
+    const dot = element('span', 'dot')
+    dot.style.background = ownerTone(player).main
+    return element('tr', player === HUMAN ? 'me' : '',
+      element('td', '', `${i + 1}.`), element('td', '', dot, t().players[player]), element('td', 'muted', result))
+  })
+  return element('table', 'places', ...rows)
 }
 
 // A label and a row of buttons, one of them pressed

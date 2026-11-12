@@ -30,11 +30,12 @@ body {
 /* Top bar */
 
 #hud {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 22px;
-  padding: 8px 16px;
+  gap: 8px 12px;
+  padding: 8px 14px 12px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
@@ -42,19 +43,71 @@ body {
 .stats {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 4px;
+  padding: 4px 8px;
   border-radius: 8px;
   border-left: 4px solid;
   background: rgba(0, 0, 0, 0.15);
 }
 
-.stats.you {
-  border-color: var(--you);
+/* A rival: only the numbers, their color tells who it is; greyed out once they have fallen */
+.stats.rival {
+  cursor: default;
 }
 
-.stats.rival {
-  border-color: var(--rival);
+.hinted.out .stats.rival {
+  opacity: 0.4;
+}
+
+.hinted.out .stats.rival b {
+  text-decoration: line-through;
+}
+
+/* The land of the map shared out in the players' colors, along the bottom of the top bar */
+.land-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9;
+  display: flex;
+  height: 5px;
+  background: #7d715b;
+  cursor: default;
+}
+
+.land-strip:hover {
+  height: 9px;
+}
+
+.land-strip > span {
+  height: 100%;
+  transition: width 0.4s;
+}
+
+.land-strip .hint {
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.land-strip:hover .hint {
+  display: block;
+}
+
+.hint table {
+  margin-top: 4px;
+  border-collapse: collapse;
+}
+
+.hint td {
+  padding: 1px 12px 1px 0;
+}
+
+.hint td:last-child {
+  padding-right: 0;
+  text-align: right;
+  font-weight: 700;
 }
 
 .stats .name {
@@ -81,7 +134,7 @@ body {
 
 .stat > b {
   min-width: 2ch;
-  margin-right: 6px;
+  margin-right: 4px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -364,6 +417,36 @@ button.primary:hover {
   white-space: nowrap;
 }
 
+/* The players' places on the results card */
+
+.places {
+  margin: 4px auto 10px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.places td {
+  padding: 4px 8px;
+  border-top: 1px solid #e3d6ba;
+}
+
+.places tr:first-child td {
+  border-top: none;
+}
+
+.places .me td {
+  font-weight: 700;
+}
+
+.places .dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
 /* Cards over the board */
 
 #overlay {
@@ -552,6 +635,11 @@ button.primary:hover {
   border-color: #c9b791;
   padding: 4px 10px;
   font-size: 13px;
+}
+
+.card .choice button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .card .choice button.active {

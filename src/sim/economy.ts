@@ -2,7 +2,7 @@ import { hexDistance } from '../core/hex'
 import { estateTiles } from './estates'
 import { BUILDING_COST, GOLD_PER_TILE, HARVEST_GOLD, TOWER_RANGE, TOWN_COST } from './rules'
 import { ownTiles } from './territory'
-import { type BuildingKind, type Cell, PLAYERS, type PlayerId, type Village, type World, opponent } from './world'
+import { type BuildingKind, type Cell, type PlayerId, type Village, type World, isEnemy } from './world'
 
 // What gold buys: a building on a field, or a village's upgrade to a town
 export type Project = BuildingKind | 'town'
@@ -14,7 +14,7 @@ export function costOf(project: Project): number {
 // Every own tile brings in a little gold, and in autumn every own farm its harvest
 export function collectGold(world: World, dt: number): void {
   const harvest = world.map.season === 'autumn' ? HARVEST_GOLD : 0
-  for (const player of PLAYERS) {
+  for (const player of world.players) {
     const farms = world.map.cells.filter((cell) => cell.owner === player && cell.building?.kind === 'farm').length
     world.gold[player] += (GOLD_PER_TILE * ownTiles(world, player) + harvest * farms) * dt
   }
@@ -33,7 +33,7 @@ export function canBuild(world: World, player: PlayerId, cell: Cell, kind: Build
 
 export function nearEnemyVillage(world: World, player: PlayerId, cell: Cell): boolean {
   return world.villages.some(
-    (village) => village.owner === opponent(player) && hexDistance(village.cell.hex, cell.hex) <= TOWER_RANGE,
+    (village) => isEnemy(village.owner, player) && hexDistance(village.cell.hex, cell.hex) <= TOWER_RANGE,
   )
 }
 

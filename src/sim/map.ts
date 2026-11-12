@@ -55,4 +55,19 @@ export class GameMap {
   mirror(cell: Cell): Cell {
     return this.cells[this.cells.length - 1 - cell.index]
   }
+
+  // Left and right swapped: odd rows are one tile shorter, so each row is centered and flips onto itself
+  flipSides(cell: Cell): Cell {
+    const row = cell.hex.r
+    return this.cellAtOffset(this.rowLength(row) - 1 - this.column(cell), row)!
+  }
+
+  // Top and bottom swapped: the height is odd, so the rows keep their length
+  flipEnds(cell: Cell): Cell {
+    return this.cellAtOffset(this.column(cell), this.height - 1 - cell.hex.r)!
+  }
+
+  private column(cell: Cell): number {
+    return cell.hex.q + Math.floor(cell.hex.r / 2)
+  }
 }

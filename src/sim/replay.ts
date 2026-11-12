@@ -16,9 +16,10 @@ export class Recording {
     this.update()
   }
 
-  // Called after every tick of the live match
+  // Called after every tick of the live match. The copies leave the orders out: the replay reads them
+  // from the live match, and each copy would otherwise carry the whole log so far, about half its size
   update(): void {
-    if (this.live.ticks % CHECKPOINT_TICKS === 0) this.checkpoints.push(copyWorld(this.live))
+    if (this.live.ticks % CHECKPOINT_TICKS === 0) this.checkpoints.push(copyWorld({ ...this.live, orders: [] }))
   }
 
   get length(): number {

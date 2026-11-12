@@ -10,6 +10,7 @@ export const MAP_DIMENSIONS: Record<MapSize, { width: number; height: number }> 
   medium: { width: 23, height: 15 },
   large: { width: 29, height: 19 },
 }
+export const MAX_RIVALS: Record<MapSize, number> = { small: 1, medium: 2, large: 3 } // bigger maps hold more players
 export const LAND_PER_VILLAGE = 22 // roughly one village for this many land tiles...
 export const VILLAGE_PAIRS = { min: 3, max: 7 } // ...but from 6 to 14 villages in all
 

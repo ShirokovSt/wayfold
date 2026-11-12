@@ -8,7 +8,9 @@ export interface Tone {
 
 const PLAYER_TONES: Tone[] = [
   { main: '#8a4fc8', dark: '#4e2a80', light: '#e4d4f6' }, // you: violet stands out against water, fields and the red rival
-  { main: '#d6493c', dark: '#8a261d', light: '#f6d2cc' }, // rival
+  { main: '#d6493c', dark: '#8a261d', light: '#f6d2cc' }, // the first rival
+  { main: '#d39a1c', dark: '#7a560c', light: '#f6e5b8' }, // mustard: darker than autumn fields
+  { main: '#1f8f86', dark: '#0f524c', light: '#c8ebe7' }, // teal: greener than water, bluer than forest
 ]
 const NEUTRAL_TONE: Tone = { main: '#d8ccb2', dark: '#7d715b', light: '#f4eedf' }
 

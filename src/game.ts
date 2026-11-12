@@ -1,9 +1,10 @@
 import { DIFFICULTIES, type Difficulty, Rival } from './ai/rival'
 import { createRandom } from './core/rng'
 import { DEFAULT_SETTINGS, type MapSettings, createWorld } from './sim/mapgen'
+import { MAX_RIVALS } from './sim/rules'
 import { Recording } from './sim/replay'
 import { tick } from './sim/tick'
-import { BEASTS, type Beasts, MAP_SIZES, MAP_TYPES, RIVAL, SEASONS, type Season, type World } from './sim/world'
+import { BEASTS, type Beasts, MAP_SIZES, MAP_TYPES, SEASONS, type Season, type World } from './sim/world'
 import { readStored, store } from './storage'
 import { tutorialWorld } from './tutorial/tutorial'
 
@@ -13,6 +14,7 @@ const SETTINGS_KEY = 'wayfold.map'
 export interface MatchSettings extends MapSettings {
   season: Season | 'random'
   beasts: Beasts
+  rivals: number // 1 to 3, as many as the map size allows
   difficulty: Difficulty
 }
 
@@ -24,7 +26,7 @@ export class Game {
   started = false // false until a match is started from the menu
   speed = 1 // how many game seconds pass in a real second
   watching = false // the finished match is played again: no orders, the moves come from the recording
-  private rival: Rival | null = null // none in the tutorial: the rival there only waits
+  private rivals: Rival[] = [] // none in the tutorial: the rival there only waits
   private recording!: Recording
 
   constructor(seed: number) {
@@ -32,13 +34,14 @@ export class Game {
   }
 
   restart(seed: number): void {
-    this.begin(createWorld(seed, this.settings))
-    this.rival = new Rival(RIVAL, createRandom(seed + 1), this.settings.difficulty)
+    const settings = this.settings
+    this.begin(createWorld(seed, { ...settings, players: settings.rivals + 1 }))
+    this.rivals = this.world.players.slice(1).map((player, i) => new Rival(player, createRandom(seed + 1 + i * 7), settings.difficulty))
   }
 
   startTutorial(): void {
     this.begin(tutorialWorld())
-    this.rival = null
+    this.rivals = []
   }
 
   private begin(world: World): void {
@@ -74,7 +77,7 @@ export class Game {
       this.recording.step(this.world)
       return
     }
-    this.rival?.update(this.world, dt)
+    for (const rival of this.rivals) rival.update(this.world, dt)
     tick(this.world, dt)
     this.recording.update()
   }
@@ -88,11 +91,13 @@ function loadSettings(): MatchSettings {
   } catch {
     // Not JSON: use the defaults
   }
+  const size = saved.size && MAP_SIZES.includes(saved.size) ? saved.size : DEFAULT_SETTINGS.size
   return {
-    size: saved.size && MAP_SIZES.includes(saved.size) ? saved.size : DEFAULT_SETTINGS.size,
+    size,
     type: saved.type === 'random' || (saved.type && MAP_TYPES.includes(saved.type)) ? saved.type : DEFAULT_SETTINGS.type,
     season: saved.season === 'random' || (saved.season && SEASONS.includes(saved.season)) ? saved.season : 'random',
     beasts: saved.beasts && BEASTS.includes(saved.beasts) ? saved.beasts : 'few',
+    rivals: Math.min(Math.max(1, Math.round(saved.rivals ?? 1)), MAX_RIVALS[size]) || 1,
     difficulty: saved.difficulty && DIFFICULTIES.includes(saved.difficulty) ? saved.difficulty : 'normal',
   }
 }

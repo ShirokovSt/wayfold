@@ -6,9 +6,10 @@ import { estateBuildings, estateTiles } from '../sim/estates'
 import { findPath, pathDuration } from '../sim/pathfind'
 import { LAIR_BOUNTY, PACK_GROWTH, POPULATION_CAP } from '../sim/rules'
 import { type Share, sendSquad, squadCell, squadSize, squadTarget } from '../sim/squads'
+import { isOut } from '../sim/tick'
 import { isGuarded } from '../sim/towers'
 import { growthRate, strengthOf } from '../sim/villages'
-import { type BuildingKind, type Cell, type PlayerId, type Village, type World, opponent } from '../sim/world'
+import { type BuildingKind, type Cell, type Owner, type PlayerId, type Village, type World, isEnemy } from '../sim/world'
 
 export type Difficulty = 'easy' | 'normal' | 'hard'
 export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard']
@@ -20,8 +21,10 @@ interface Profile {
   margin: number // extra people sent on top of what the target should have on arrival
   maxGroup: number // villages that may attack one target together
   defendChance: number // how likely it notices that a village of its own is under attack
+  hunts: boolean // among several enemies, goes for the weakest to knock them out, and keeps the strongest down
   watch: Watch
   builds: Project[]
+  towns(villages: number): number // how many towns it wants: they grow slower, so never all of its villages
 }
 
 // Which enemy squads a village keeps a garrison against: none (it sends everyone),
@@ -32,10 +35,12 @@ const NEARBY = 3 // tiles
 // Something to attack: a village, or a wolves' den worth its bounty
 interface Target {
   cell: Cell
+  owner: Owner
   guarded: boolean // only soldiers can take it
   bounty: number // gold for taking it
   defence(seconds: number): number // its strength when a squad gets there
 }
+const BIG_VILLAGE = 20 // people: worth turning into a town even away from the front
 const WILD_LOSSES = 3 // people a squad may lose to bites on its way to a den
 const TOWER_LOSSES = 1.5 // a squad under a tower's volleys needs about half as many again
 
@@ -47,9 +52,18 @@ interface Sender {
 }
 
 const PROFILES: Record<Difficulty, Profile> = {
-  easy: { firstMove: 20, think: 6, margin: 6, maxGroup: 1, defendChance: 0.5, watch: 'none', builds: ['farm'] },
-  normal: { firstMove: 10, think: 3.5, margin: 4, maxGroup: 3, defendChance: 1, watch: 'aimed', builds: ['farm', 'town', 'tower'] },
-  hard: { firstMove: 6, think: 2, margin: 4, maxGroup: 4, defendChance: 1, watch: 'nearby', builds: ['farm', 'town', 'tower'] },
+  easy: {
+    firstMove: 20, think: 6, margin: 6, maxGroup: 1, defendChance: 0.5, hunts: false, watch: 'none', builds: ['farm'],
+    towns: () => 0,
+  },
+  normal: {
+    firstMove: 10, think: 3.5, margin: 4, maxGroup: 3, defendChance: 1, hunts: false, watch: 'aimed', builds: ['farm', 'town', 'tower'],
+    towns: (villages) => (villages >= 5 ? 3 : villages >= 3 ? 2 : 0),
+  },
+  hard: {
+    firstMove: 6, think: 2, margin: 4, maxGroup: 4, defendChance: 1, hunts: true, watch: 'nearby', builds: ['farm', 'town', 'tower'],
+    towns: (villages) => (villages >= 3 ? Math.max(2, Math.floor(villages / 2)) : 0),
+  },
 }
 
 // A simple opponent: every few seconds it makes one move — defend, capture or raid — and spends its gold
@@ -77,7 +91,8 @@ export class Rival {
   }
 
   // A farm at the capital first, then the capital becomes a town once it has a few villages, a tower at the front,
-  // farms for the other villages and then second farms; it saves up for the first plan with a free spot
+  // farms for the other villages and then second farms; with gold to spare, more towns, the front ones first,
+  // where soldiers are needed. It saves up for the first plan with a free spot
   private develop(world: World): void {
     const villages = this.villages(world)
     const capital = villages.find((v) => v.capital)
@@ -89,6 +104,12 @@ export class Rival {
     if (front && estateBuildings(world, front, 'tower').length === 0) plans.push([front, 'tower'])
     for (const village of villages) if (farms(village) === 0) plans.push([village, 'farm'])
     for (const village of villages) if (farms(village) === 1) plans.push([village, 'farm'])
+    if (villages.filter((village) => village.town).length < this.profile.towns(villages.length)) {
+      const upgrade = (village: Village | null) => village && !village.town && plans.push([village, 'town'])
+      upgrade(capital ?? null)
+      upgrade(front)
+      for (const village of villages.filter((village) => village.population >= BIG_VILLAGE)) upgrade(village)
+    }
 
     for (const [village, kind] of plans.filter(([, kind]) => this.profile.builds.includes(kind))) {
       if (kind === 'town') {
@@ -122,7 +143,7 @@ export class Rival {
   }
 
   private enemyVillages(world: World): Village[] {
-    return world.villages.filter((village) => village.owner === opponent(this.player))
+    return world.villages.filter((village) => isEnemy(village.owner, this.player))
   }
 
   // Sends help to a village that an enemy squad or a wolf pack is about to take or thin out
@@ -163,7 +184,7 @@ export class Rival {
         strength += this.power(sender.from, sender.shares[sender.shares.length - 1])
         const needed = to.defence(sender.time) + this.profile.margin - incoming(world, to.cell, (owner) => owner === this.player)
         // A lone attack is simpler, so it is preferred; a den's bounty makes it a little more tempting
-        const score = sender.time + needed * 0.3 + i * 3 - to.bounty * 0.1
+        const score = sender.time + needed * 0.3 + i * 3 - to.bounty * 0.1 - this.preference(world, to.owner)
         if (strength >= needed && (!best || score < best.score)) {
           const group = senders.slice(0, i + 1)
           best = { group, shares: this.smallestShares(group, needed), to, score }
@@ -176,6 +197,18 @@ export class Rival {
     return true
   }
 
+  // Nobody is singled out, you included: an easy or normal rival takes whatever is cheapest and closest.
+  // A hard one, facing several enemies, finishes off the weakest and keeps the strongest from running away
+  private preference(world: World, owner: Owner): number {
+    if (!this.profile.hunts || owner === null || !isEnemy(owner, this.player)) return 0
+    const enemies = world.players.filter((player) => isEnemy(player, this.player) && !isOut(world, player))
+    if (enemies.length < 2) return 0
+    const villages = (player: PlayerId) => world.villages.filter((village) => village.owner === player).length
+    const counts = enemies.map(villages)
+    const count = villages(owner)
+    return (count === Math.min(...counts) ? 4 : 0) + (count === Math.max(...counts) ? 2 : 0)
+  }
+
   // Villages that are not its own, and wolves' dens: what each will have to be beaten by on arrival
   private targets(world: World): Target[] {
     const villages = world.villages
@@ -186,6 +219,7 @@ export class Rival {
         const towerLosses = guarded ? TOWER_LOSSES : 1
         return {
           cell: village.cell,
+          owner: village.owner,
           guarded,
           bounty: 0,
           defence: (seconds: number) =>
@@ -194,6 +228,7 @@ export class Rival {
       })
     const lairs = world.lairs.map((lair) => ({
       cell: lair.cell,
+      owner: null,
       guarded: false,
       bounty: LAIR_BOUNTY,
       // The bites on the way through the wild land cost a few people too

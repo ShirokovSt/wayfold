@@ -9,7 +9,6 @@ import { CameraControls } from './input/camera'
 import { PointerInput } from './input/pointer'
 import { Renderer } from './render/renderer'
 import { TICK_SECONDS } from './sim/rules'
-import { HUMAN } from './sim/world'
 import { readStored, store } from './storage'
 import { BuildMenu } from './ui/buildMenu'
 import { Hud, PLAY_SPEED_LIMIT } from './ui/hud'
@@ -186,7 +185,7 @@ function playSpeed(): void {
 }
 
 function showEnd(): void {
-  screens.end(game.world.winner === HUMAN, game.world.time, chooseNewMap, openMenu, watchReplay)
+  screens.end(game.world, chooseNewMap, openMenu, watchReplay)
 }
 
 const showTexts = () => (banner.textContent = t().pausedHint)

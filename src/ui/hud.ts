@@ -1,8 +1,9 @@
 import { sounds } from '../audio/sounds'
 import type { Game } from '../game'
 import { onLanguageChange, t } from '../i18n'
+import { ownerTone } from '../render/palette'
 import { landShare } from '../sim/territory'
-import { HUMAN, PLAYERS, type PlayerId, type Season, type World } from '../sim/world'
+import { HUMAN, type PlayerId, type Season, type World } from '../sim/world'
 import { button, element } from './dom'
 import { withHint } from './hint'
 
@@ -12,6 +13,7 @@ const SEASON_ICONS: Record<Season, string> = { summer: '☀', autumn: '🍂', wi
 
 type Stat = 'villages' | 'people' | 'land' | 'gold'
 const STATS: Stat[] = ['villages', 'people', 'land', 'gold']
+const RIVAL_STATS = ['villages', 'people', 'land'] as const // a rival's gold is none of your business
 // Little pictures instead of words: a house, a person, a tile and a coin
 const ICONS: Record<Stat, string> = {
   villages: '<path d="M2 8 8 2.5 14 8v6H2z"/>',
@@ -34,9 +36,21 @@ interface Actions {
   setSpeed(speed: number): void
 }
 
-// The top bar holds only the match: the menu button, both players' numbers, the season, the clock, speed and pause
+// One player's numbers in the bar; a rival's block also says when they fell
+interface Row {
+  player: PlayerId
+  block: HTMLElement
+  values: Partial<Record<Stat, HTMLElement>>
+  note: HTMLElement
+}
+
+// The top bar holds only the match: the menu button, your numbers and every rival's, the season, the clock,
+// speed and pause; a thin strip along its bottom shares the map's land out in the players' colors
 export class Hud {
-  private values: { player: PlayerId; values: Record<Stat, HTMLElement> }[] = []
+  private rows: Row[] = []
+  private players = 0 // how many players the bar is built for
+  private strip = element('div', 'land-strip')
+  private stripRows = element('table', '')
   private clock = element('span', 'clock')
   // The season's icon; hovering or clicking it shows the season's rules
   private seasonButton = button('', () => {}, 'season-button')
@@ -59,12 +73,17 @@ export class Hud {
 
   update(): void {
     const world = this.game.world
-    for (const { player, values } of this.values) {
-      setText(values.gold, String(Math.floor(world.gold[player])))
-      setText(values.villages, String(world.villages.filter((v) => v.owner === player).length))
-      setText(values.people, String(countPeople(world, player)))
-      setText(values.land, `${Math.round(landShare(world, player) * 100)}%`)
+    if (world.players.length !== this.players) this.build()
+    for (const { player, block, values, note } of this.rows) {
+      const out = world.out.find((entry) => entry.player === player)
+      block.classList.toggle('out', out !== undefined)
+      if (values.gold) setText(values.gold, String(Math.floor(world.gold[player])))
+      setText(values.villages!, String(world.villages.filter((v) => v.owner === player).length))
+      setText(values.people!, String(countPeople(world, player)))
+      setText(values.land!, `${Math.round(landShare(world, player) * 100)}%`)
+      setText(note, out ? `${t().outAt} ${formatTime(out.time)}` : t().rivalHint)
     }
+    this.updateStrip(world)
     const season = world.map.season
     setText(this.seasonButton, SEASON_ICONS[season])
     setText(this.seasonName, t().seasons[season])
@@ -81,28 +100,64 @@ export class Hud {
   }
 
   private build(): void {
+    const world = this.game.world
+    this.players = world.players.length
     const menu = button('', () => this.actions.openMenu(), 'icon-button')
     menu.innerHTML = MENU_ICON
     menu.title = `${t().menu} (Esc)`
     menu.ariaLabel = t().menu
-    this.values = []
-    const stats = PLAYERS.map((player) => {
-      const values = { villages: element('b', ''), people: element('b', ''), land: element('b', ''), gold: element('b', '') }
-      this.values.push({ player, values })
-      const items = STATS.map((stat) =>
-        withHint(element('span', 'stat', icon(stat), values[stat]), element('b', '', t()[stat]), element('p', '', t().statHints[stat])))
-      return element('div', `stats ${player === HUMAN ? 'you' : 'rival'}`, element('span', 'name', player === HUMAN ? t().you : t().rival), ...items)
-    })
+    this.rows = world.players.map((player) => (player === HUMAN ? this.yourRow() : this.rivalRow(player)))
     this.speedButtons = SPEEDS.map((speed) => button(`×${speed}`, () => this.actions.setSpeed(speed)))
     const speeds = element('div', 'speed', ...this.speedButtons)
     speeds.title = t().speed
     this.root.replaceChildren(
       menu,
-      ...stats,
+      ...this.rows.map((row) => row.block),
       element('div', 'when', this.season, this.clock),
       element('div', 'group', speeds, this.pauseButton, this.soundButton),
+      this.strip,
     )
     this.update()
+  }
+
+  // Your numbers, each with its own explanation
+  private yourRow(): Row {
+    const values = { villages: element('b', ''), people: element('b', ''), land: element('b', ''), gold: element('b', '') }
+    const items = STATS.map((stat) =>
+      withHint(element('span', 'stat', icon(stat), values[stat]), element('b', '', t()[stat]), element('p', '', t().statHints[stat])))
+    const block = element('div', 'stats', element('span', 'name', t().you), ...items)
+    block.style.borderColor = ownerTone(HUMAN).main
+    return { player: HUMAN, block, values, note: element('span', '') }
+  }
+
+  // A rival is known by their color: the name and what the numbers mean are in the hint
+  private rivalRow(player: PlayerId): Row {
+    const values = { villages: element('b', ''), people: element('b', ''), land: element('b', '') }
+    const chip = element('span', 'stats rival', ...RIVAL_STATS.map((stat) => element('span', 'stat', icon(stat), values[stat])))
+    chip.style.borderColor = ownerTone(player).main
+    const note = element('p', '')
+    return { player, block: withHint(chip, element('b', '', t().players[player]), note), values, note }
+  }
+
+  // Each player's share of all the land, and nobody's share in grey at the end
+  private updateStrip(world: World): void {
+    const shares = world.players.map((player) => ({ player, share: landShare(world, player) }))
+    const free = Math.max(0, 1 - shares.reduce((sum, { share }) => sum + share, 0))
+    const key = shares.map(({ share }) => share.toFixed(3)).join()
+    if (this.strip.dataset.key === key) return
+    this.strip.dataset.key = key
+    const parts = shares.map(({ player, share }) => {
+      const part = element('span', '')
+      part.style.width = `${share * 100}%`
+      part.style.background = ownerTone(player).main
+      return part
+    })
+    const percent = (share: number) => `${Math.round(share * 100)}%`
+    this.stripRows.replaceChildren(
+      ...shares.map(({ player, share }) => element('tr', '', element('td', '', t().players[player]), element('td', '', percent(share)))),
+      element('tr', '', element('td', '', t().nobodys), element('td', '', percent(free))),
+    )
+    this.strip.replaceChildren(...parts, element('div', 'hint', element('b', '', t().landHint), this.stripRows))
   }
 }
 

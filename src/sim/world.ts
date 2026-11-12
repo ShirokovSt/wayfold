@@ -2,10 +2,11 @@ import type { Hex, Point } from '../core/hex'
 import type { GameMap } from './map'
 import type { Share } from './squads'
 
-export type PlayerId = 0 | 1
+// You and up to three rivals, everyone against everyone
+export type PlayerId = 0 | 1 | 2 | 3
 export const HUMAN: PlayerId = 0
-export const RIVAL: PlayerId = 1
-export const PLAYERS: readonly PlayerId[] = [HUMAN, RIVAL]
+export const RIVAL: PlayerId = 1 // the first rival; the only one in a match of two
+export const PLAYERS: readonly PlayerId[] = [0, 1, 2, 3]
 
 // null means nobody's: wild land or a neutral village
 export type Owner = PlayerId | null
@@ -128,7 +129,9 @@ export interface World {
   time: number // seconds since the match started
   ticks: number // simulation steps since the match started
   biteIn: number // seconds until wolves bite squads in the wild land again
-  winner: PlayerId | null
+  players: PlayerId[] // who plays this match
+  out: { player: PlayerId; time: number }[] // who has lost everything, and when
+  winner: PlayerId | null // set when the match is over for you: the last one standing, or the leader when you fall
   nextId: number
   orders: Order[] // everything the players ordered, so the match can be watched again
 }
@@ -141,13 +144,16 @@ export type Order = { at: number; player: PlayerId } & (
   | { kind: 'town'; village: number }
 )
 
-export function newWorld(map: GameMap, villages: Village[], mapType: MapType = 'continent', lairs: Lair[] = []): World {
+export function newWorld(
+  map: GameMap, villages: Village[], mapType: MapType = 'continent', lairs: Lair[] = [], players = 2,
+): World {
   return {
-    map, mapType, villages, squads: [], lairs, packs: [], gold: { 0: 0, 1: 0 }, arrows: [], bites: [], time: 0, ticks: 0,
-    biteIn: 0, winner: null, nextId: 0, orders: [],
+    map, mapType, villages, squads: [], lairs, packs: [], gold: { 0: 0, 1: 0, 2: 0, 3: 0 }, arrows: [], bites: [],
+    time: 0, ticks: 0, biteIn: 0, players: PLAYERS.slice(0, players), out: [], winner: null, nextId: 0, orders: [],
   }
 }
 
-export function opponent(player: PlayerId): PlayerId {
-  return player === HUMAN ? RIVAL : HUMAN
+// Somebody else's: any other player, not a neutral village
+export function isEnemy(owner: Owner, player: PlayerId): boolean {
+  return owner !== null && owner !== player
 }
