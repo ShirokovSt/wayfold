@@ -77,6 +77,7 @@ export interface Pack {
 export interface Village {
   readonly id: number
   readonly cell: Cell
+  name: number // see names.ts
   owner: Owner
   population: number // fractional: grows a little every tick
   capital: boolean // each player has one capital, marked with a crown

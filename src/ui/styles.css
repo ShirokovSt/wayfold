@@ -292,24 +292,72 @@ button.primary:hover {
   display: none;
 }
 
-/* Build menu: a row of buildings above the clicked tile */
+/* Tile card: what is on the clicked tile, and below it what can be bought there */
 
-.build-menu {
+.tile-card {
   position: absolute;
-  transform: translate(-50%, -100%);
+  transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   gap: 6px;
-  padding: 6px;
+  max-width: 260px;
+  padding: 8px;
   border-radius: 12px;
+  color: var(--ink);
   background: var(--paper);
   box-shadow: 0 4px 0 #c9b791, 0 10px 24px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+  line-height: 1.3;
 }
 
-.build-menu[hidden] {
+.tile-card[hidden],
+.card-actions[hidden],
+.card-info:empty {
   display: none;
 }
 
-.build-menu .building {
+.card-info header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 6px;
+}
+
+.card-info .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  align-self: center;
+}
+
+.card-info .kind {
+  color: #7a6650;
+}
+
+.card-info p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 3px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-info .item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.card-info .stat-icon {
+  color: #7a6650;
+}
+
+.card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.card-actions .building {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -322,21 +370,21 @@ button.primary:hover {
   font-size: 13px;
 }
 
-.build-menu .building:hover:not(:disabled) {
+.card-actions .building:hover:not(:disabled) {
   background: #f8f0dd;
 }
 
-.build-menu .building:disabled {
+.card-actions .building:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
-.build-menu .icon {
+.card-actions .icon {
   width: 44px;
   height: 44px;
 }
 
-.build-menu .note {
+.card-actions .note {
   max-width: 76px;
   color: #a33a2f;
   font-size: 11px;
@@ -344,11 +392,11 @@ button.primary:hover {
   text-align: center;
 }
 
-.build-menu .note:empty {
+.card-actions .note:empty {
   display: none;
 }
 
-.build-menu .cost {
+.card-actions .cost {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -387,19 +435,13 @@ button.primary:hover {
 /* Replay: a bar under the board with the timeline */
 
 .replay {
-  position: absolute;
-  left: 50%;
-  bottom: 12px;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 10px;
-  width: min(640px, calc(100% - 100px));
-  padding: 6px 12px;
-  border-radius: 12px;
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: 0 3px 0 #c9b791, 0 6px 16px rgba(0, 0, 0, 0.35);
+  /* The controls keep to the middle 640 pixels of a wide screen */
+  padding: 8px max(14px, calc((100% - 640px) / 2));
+  background: var(--panel);
+  border-top: 1px solid var(--border);
 }
 
 .replay[hidden] {

@@ -9,11 +9,12 @@ import { CameraControls } from './input/camera'
 import { PointerInput } from './input/pointer'
 import { Renderer } from './render/renderer'
 import { TICK_SECONDS } from './sim/rules'
+import type { Cell } from './sim/world'
 import { readStored, store } from './storage'
-import { BuildMenu } from './ui/buildMenu'
 import { Hud, PLAY_SPEED_LIMIT } from './ui/hud'
 import { ReplayBar } from './ui/replayBar'
 import { Screens } from './ui/screens'
+import { TileCard } from './ui/tileCard'
 import { TutorialPanel } from './ui/tutorialPanel'
 import { zoomButtons } from './ui/zoomButtons'
 
@@ -34,7 +35,7 @@ const input = new PointerInput(canvas, renderer.layout, game)
 const screens = new Screens(document.querySelector('#overlay')!)
 const hud = new Hud(document.querySelector('#hud')!, game, { togglePause, openMenu, setSpeed })
 const stage = document.querySelector<HTMLElement>('.stage')!
-const buildMenu = new BuildMenu(stage, game, renderer.layout)
+const card = new TileCard(stage, game, renderer.layout)
 const camera = new CameraControls(canvas, renderer.layout)
 const banner = document.querySelector<HTMLElement>('#banner')!
 const tutorial = new TutorialPanel(stage, skipTutorial)
@@ -43,17 +44,17 @@ const events = new EventWatcher()
 let endShown = false
 let pausedBeforeMenu = false
 
-input.onPress = () => buildMenu.close()
+// Any press closes the card; a click on another tile opens that one's, a click on the same tile leaves it closed
+let closedCell: Cell | null = null
+input.onPress = () => {
+  closedCell = card.cell
+  card.close()
+}
 input.onTileClick = (cell) => {
-  if (!game.watching) buildMenu.open(cell)
+  if (cell !== closedCell) card.open(cell)
 }
-// The build menu would stay where its tile used to be, so it closes when the map moves
-const cameraMoved = () => {
-  renderer.cameraMoved()
-  buildMenu.close()
-}
-input.onCameraMove = cameraMoved
-camera.onChange = cameraMoved
+input.onCameraMove = () => renderer.cameraMoved()
+camera.onChange = () => renderer.cameraMoved()
 zoomButtons(stage, camera)
 
 function play(): void {
@@ -93,7 +94,7 @@ function openMenu(): void {
     banner.hidden = true
     input.drag = null
     input.hover = null
-    buildMenu.close()
+    card.close()
   }
   if (!inMatch()) music.play('menu')
   screens.menu({
@@ -153,7 +154,7 @@ function startMatch(): void {
   music.play(game.world.map.season)
   renderer.setWorld(game.world)
   input.drag = null
-  buildMenu.close()
+  card.close()
   endShown = false
   playSpeed()
   play()
@@ -161,6 +162,7 @@ function startMatch(): void {
 
 // The finished match from the start, at any speed; the board can be moved and zoomed, but not ordered
 function watchReplay(): void {
+  card.close() // its tile is in the world being left
   game.watch()
   renderer.showWorld(game.world)
   music.play(game.world.map.season)
@@ -168,11 +170,13 @@ function watchReplay(): void {
 }
 
 function seek(ticks: number): void {
+  card.close()
   game.watch(ticks)
   renderer.showWorld(game.world)
 }
 
 function stopWatching(): void {
+  card.close()
   game.stopWatching()
   renderer.showWorld(game.world)
   playSpeed()
@@ -192,10 +196,7 @@ const showTexts = () => (banner.textContent = t().pausedHint)
 showTexts()
 onLanguageChange(showTexts)
 
-new ResizeObserver(() => {
-  renderer.resize()
-  buildMenu.close() // it would stay where the tile used to be
-}).observe(canvas)
+new ResizeObserver(() => renderer.resize()).observe(canvas)
 // Esc first cancels what is in hand, then opens the menu; on a card it goes back
 window.addEventListener('keydown', (event) => {
   if (screens.isOpen) {
@@ -204,7 +205,7 @@ window.addEventListener('keydown', (event) => {
   }
   if (event.key === 'Escape') {
     if (input.drag) input.drag = null
-    else if (buildMenu.cell) buildMenu.close()
+    else if (card.cell) card.close()
     else if (game.watching) stopWatching()
     else openMenu()
   } else if (event.code === 'Space') {
@@ -236,12 +237,13 @@ function frame(now: number): void {
     if (event === 'victory' || event === 'defeat') music.hush(6)
     sounds.play(event)
   }
-  buildMenu.update()
+  card.update()
   tutorial.update(game.world, game.paused)
   renderer.draw(game.paused ? 1 : pending / TICK_MS, now / 1000, {
     drag: input.drag,
     hover: input.hover,
-    selected: buildMenu.cell,
+    selected: card.cell,
+    focus: card.village,
     showRoutes: game.paused,
     marked: tutorial.marked(game.world),
   })

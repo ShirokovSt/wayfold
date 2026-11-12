@@ -10,7 +10,7 @@ interface Actions {
   exit(): void
 }
 
-// Under the board while a replay plays: play and pause, a slider through the whole match, the time, and the way out
+// Along the bottom while a replay plays, so the board above it stays in full view: play and pause, a slider through the whole match, the time, and the way out
 export class ReplayBar {
   private readonly root = element('div', 'replay')
   private readonly playButton = button('', () => this.actions.togglePause(), 'icon-button')
@@ -31,7 +31,7 @@ export class ReplayBar {
     this.slider.addEventListener('input', () => this.actions.seek(Number(this.slider.value)))
     this.root.append(this.label, this.playButton, this.slider, this.time, this.exitButton)
     this.root.hidden = true
-    stage.append(this.root)
+    stage.after(this.root)
     this.showTexts()
     onLanguageChange(() => this.showTexts())
   }

@@ -14,13 +14,13 @@ export interface Drag {
   squads: Squad[]
   target: Cell | null
   paths: Cell[][] // the route of every member that can reach the target
-  share: Share // everyone in each village goes, or half while Shift is held
+  share: Share // everyone in each village goes, or half while Ctrl is held
 }
 
 // Press on your village or squad, sweep over more of them, release on the target: they all set off,
-// all of each village's people, or half of them with Shift held.
+// all of each village's people, or half of them with Ctrl (⌘ on a Mac) held.
 // Dragging empty ground moves the map, two fingers on a touch screen zoom it,
-// and a plain click on a tile or on your village is passed on, e.g. to open the build menu
+// and a plain click on a tile or on your village is passed on, to open the card about it
 export class PointerInput {
   drag: Drag | null = null
   hover: Cell | null = null
@@ -28,6 +28,7 @@ export class PointerInput {
   onTileClick: (cell: Cell) => void = () => {}
   onCameraMove: () => void = () => {}
   private pressed: Cell | null = null // a tile pressed outside of a drag
+  private strayed = false // the drag has left the tile it started on, so coming back is not a click
   private pan: { x: number; y: number; moved: boolean } | null = null
   private touches = new Map<number, Point>()
   private pinchDistance = 0
@@ -46,10 +47,10 @@ export class PointerInput {
       this.pan = null
     })
     canvas.addEventListener('pointerleave', () => (this.hover = null))
-    // Shift can be pressed or let go in the middle of a drag
+    // Ctrl can be pressed or let go in the middle of a drag. Not Shift: pressed often, it calls up Windows' sticky keys
     for (const type of ['keydown', 'keyup'] as const) {
       window.addEventListener(type, (event) => {
-        if (this.drag && event.key === 'Shift') this.drag.share = event.shiftKey ? 'half' : 'all'
+        if (this.drag && (event.key === 'Control' || event.key === 'Meta')) this.drag.share = shareOf(event)
       })
     }
   }
@@ -63,6 +64,7 @@ export class PointerInput {
       return
     }
     this.drag = { villages: [], squads: [], target: null, paths: [], share: shareOf(event) }
+    this.strayed = false
     // Orders work during the pause too: plan calmly, then let it run
     if (this.game.watching || this.game.world.winner !== null || !this.gather(event)) {
       this.drag = null
@@ -91,8 +93,11 @@ export class PointerInput {
     const cell = this.cellAt(event) ?? null
     this.hover = cell
     const drag = this.drag
-    this.canvas.style.cursor = drag || this.ownVillageAt(event) || this.ownSquadAt(event) ? 'pointer' : 'default'
+    // Villages, buildings and dens can be clicked for a card about them
+    const clickable = cell && (cell.village || cell.building || cell.lair)
+    this.canvas.style.cursor = drag || clickable || this.ownSquadAt(event) ? 'pointer' : 'default'
     if (!drag) return
+    if (cell !== drag.villages[0]?.cell) this.strayed = true
     drag.share = shareOf(event)
     const joined = this.gather(event)
     if (joined || cell !== drag.target) {
@@ -113,10 +118,11 @@ export class PointerInput {
       if (!panned && pressed && pressed === this.cellAt(event)) this.onTileClick(pressed)
       return
     }
-    // Released on the only village it started from: a click, e.g. to upgrade the village
+    // Released on the only village it started from without leaving it: a click, e.g. to upgrade the village.
+    // Led away and brought back, it is a change of mind: nothing happens
     const releasedOn = drag.target ?? this.cellAt(event)
     if (drag.squads.length === 0 && drag.villages.length === 1 && drag.villages[0].cell === releasedOn) {
-      this.onTileClick(releasedOn)
+      if (!this.strayed) this.onTileClick(releasedOn)
       return
     }
     if (!drag.target) return
@@ -204,6 +210,6 @@ export class PointerInput {
   }
 }
 
-function shareOf(event: PointerEvent): Share {
-  return event.shiftKey ? 'half' : 'all'
+function shareOf(event: PointerEvent | KeyboardEvent): Share {
+  return event.ctrlKey || event.metaKey ? 'half' : 'all'
 }

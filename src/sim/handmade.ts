@@ -22,7 +22,7 @@ export function addLair(world: World, col: number, row: number, size: number): L
 
 export function addVillage(world: World, col: number, row: number, owner: Owner, population: number, capital = false): Village {
   const cell = world.map.cellAtOffset(col, row)!
-  const village = { id: world.villages.length, cell, owner, population, capital, town: false, capturedAt: 0 }
+  const village = { id: world.villages.length, cell, name: (world.villages.length * 13) % 400, owner, population, capital, town: false, capturedAt: 0 }
   cell.village = village
   cell.owner = owner
   world.villages.push(village)

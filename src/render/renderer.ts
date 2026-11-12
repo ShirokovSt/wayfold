@@ -2,8 +2,7 @@ import type { Drag } from '../input/pointer'
 import { squadSize } from '../sim/squads'
 import { ARROW_SECONDS } from '../sim/towers'
 import { BITE_SECONDS } from '../sim/beasts'
-import { t } from '../i18n'
-import { type Bite, type Cell, HUMAN, type Lair, type Pack, type Squad, type World } from '../sim/world'
+import { type Bite, type Cell, HUMAN, type Pack, type Squad, type Village, type World } from '../sim/world'
 import {
   drawDecor, drawEstates, drawGround, drawTable, drawTerritory, drawTowerZones, drawWildLand, hexPath, tileCenter,
 } from './board'
@@ -11,7 +10,7 @@ import {
   SQUAD_BADGE, TOWER_TOP, VILLAGE_BADGE, drawArrow, drawBadge, drawBuilding, drawClaws, drawCrown, drawLair, drawPerson, drawVillage, drawWolf,
 } from './figures'
 import { Layout } from './layout'
-import { GOLD, HINT, WILD_TONE, ownerTone } from './palette'
+import { GOLD, WILD_TONE, ownerTone } from './palette'
 
 // Where the walkers of a squad stand around its position, in tile sizes; at most this many are drawn
 const FORMATION = [
@@ -28,7 +27,8 @@ const FORMATION = [
 export interface View {
   drag: Drag | null
   hover: Cell | null // the tile under the pointer
-  selected: Cell | null // the tile the build menu is open for
+  selected: Cell | null // the tile the card is open for
+  focus: Village | null // the village the card is about, or whose estate its tile is in
   showRoutes: boolean // on pause: where your squads are heading
   marked: Cell[] // tiles the tutorial points at
 }
@@ -93,14 +93,17 @@ export class Renderer {
     ctx.drawImage(this.ground, 0, 0, this.width, this.height)
     drawTerritory(ctx, this.world.map, this.layout)
     const hovered = view.hover?.village
-    drawEstates(ctx, this.world, this.layout, hovered?.owner === HUMAN ? hovered : null)
-    drawTowerZones(ctx, this.world, this.layout, view.hover)
+    drawEstates(ctx, this.world, this.layout, view.focus ?? (hovered?.owner === HUMAN ? hovered : null))
+    const tower = view.selected?.building?.kind === 'tower' ? view.selected : view.hover
+    drawTowerZones(ctx, this.world, this.layout, tower)
     drawWildLand(ctx, this.world.map, this.layout)
     ctx.drawImage(this.decor, 0, 0, this.width, this.height)
-    if (view.selected) {
-      ctx.lineWidth = size * 0.08
-      ctx.strokeStyle = ownerTone(HUMAN).light
-      hexPath(ctx, tileCenter(this.layout, view.selected), size * 0.86)
+    // The card's tile, and the village a building works for
+    ctx.lineWidth = size * 0.08
+    ctx.strokeStyle = ownerTone(HUMAN).light
+    for (const cell of new Set([view.selected, view.focus?.cell])) {
+      if (!cell) continue
+      hexPath(ctx, tileCenter(this.layout, cell), size * 0.86)
       ctx.stroke()
     }
     // A slow pulse, so the eye finds them without them getting in the way
@@ -152,34 +155,6 @@ export class Renderer {
       drawBadge(ctx, x, y + size * 0.55, String(Math.floor(lair.pack)), size, WILD_TONE)
     }
     if (view.drag) this.drawLeaving(view.drag)
-    const den = view.hover?.lair
-    if (den && !view.drag) this.drawLairHint(den)
-  }
-
-  // A small card over the hovered den: what it is, how many wolves it holds and what clearing it brings
-  private drawLairHint(lair: Lair): void {
-    const ctx = this.ctx
-    const { x, y } = tileCenter(this.layout, lair.cell)
-    const lines = [t().lairName, `${t().lairPack}: ${Math.floor(lair.pack)}`, t().lairBounty]
-    ctx.font = '600 13px system-ui, sans-serif'
-    const width = Math.max(...lines.map((line) => ctx.measureText(line).width)) + 24
-    const height = lines.length * 18 + 14
-    const left = Math.min(Math.max(8, x - width / 2), this.width - width - 8)
-    const top = Math.max(8, y - this.layout.size * 0.9 - height)
-    ctx.beginPath()
-    ctx.roundRect(left, top, width, height, 10)
-    ctx.fillStyle = HINT.card
-    ctx.shadowColor = HINT.shadow
-    ctx.shadowBlur = 12
-    ctx.fill()
-    ctx.shadowBlur = 0
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'top'
-    lines.forEach((line, i) => {
-      ctx.font = i === 0 ? '700 13px system-ui, sans-serif' : '13px system-ui, sans-serif'
-      ctx.fillStyle = HINT.ink
-      ctx.fillText(line, left + 12, top + 8 + i * 18)
-    })
   }
 
   private drawLayers(): void {

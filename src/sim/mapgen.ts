@@ -3,6 +3,7 @@ import { createNoise } from '../core/noise'
 import { type Random, createRandom, pick, randomInt } from '../core/rng'
 import { makeLair } from './beasts'
 import { GameMap } from './map'
+import { nameVillages } from './names'
 import { findPath, pathDuration } from './pathfind'
 import {
   LAIR_COUNT,
@@ -106,6 +107,7 @@ function tryCreateWorld(
   // Dens have their own random numbers, so turning beasts on or off leaves the rest of the map as it was
   const lairs = beasts === 'none' ? [] : placeLairs(map, villages, images, LAIR_COUNT[size][beasts], createRandom(seed + 104729))
   if (season === 'winter') freezeInlandWater(map, river)
+  nameVillages(villages, createRandom(seed + 7727))
   return newWorld(map, villages, type, lairs, players)
 }
 
@@ -286,7 +288,7 @@ function placeVillages(map: GameMap, random: Random, images: Images, players: nu
 
   const villages: Village[] = []
   const addVillage = (cell: Cell, owner: Owner, population: number) => {
-    const village = { id: villages.length, cell, owner, population, capital: owner !== null, town: false, capturedAt: 0 }
+    const village = { id: villages.length, cell, name: 0, owner, population, capital: owner !== null, town: false, capturedAt: 0 }
     cell.terrain = 'field'
     cell.village = village
     cell.owner = owner
