@@ -36,11 +36,12 @@ export interface View {
 export class Renderer {
   readonly layout = new Layout()
   private readonly ctx: CanvasRenderingContext2D
-  // The board itself never changes during a match, so it is drawn into these layers
-  // and redrawn only when the camera moves
+  // The board itself hardly changes during a match, so it is drawn into these layers
+  // and redrawn only when the camera moves or a forest is cut down
   private readonly ground = document.createElement('canvas')
   private readonly decor = document.createElement('canvas')
   private layersStale = true
+  private forests = 0
   private width = 0
   private height = 0
 
@@ -88,6 +89,11 @@ export class Renderer {
     const ctx = this.ctx
     const dpr = this.canvas.width / this.width
     const size = this.layout.size
+    const forests = this.world.map.cells.filter((cell) => cell.terrain === 'forest').length
+    if (forests !== this.forests) {
+      this.forests = forests
+      this.layersStale = true
+    }
     if (this.layersStale) this.drawLayers()
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.drawImage(this.ground, 0, 0, this.width, this.height)

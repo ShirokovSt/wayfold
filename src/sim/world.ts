@@ -143,6 +143,8 @@ export type Order = { at: number; player: PlayerId } & (
   | { kind: 'redirect'; squad: number; to: number }
   | { kind: 'build'; cell: number; building: BuildingKind }
   | { kind: 'town'; village: number }
+  | { kind: 'sell'; cell: number }
+  | { kind: 'clear'; cell: number }
 )
 
 export function newWorld(

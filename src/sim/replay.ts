@@ -1,4 +1,4 @@
-import { build, upgradeToTown } from './economy'
+import { build, clearForest, sell, upgradeToTown } from './economy'
 import { GameMap } from './map'
 import { TICK_SECONDS } from './rules'
 import { redirectSquad, sendSquad } from './squads'
@@ -64,6 +64,12 @@ function perform(world: World, order: Order): void {
     }
     case 'build':
       build(world, order.player, cells[order.cell], order.building)
+      break
+    case 'sell':
+      sell(world, order.player, cells[order.cell])
+      break
+    case 'clear':
+      clearForest(world, order.player, cells[order.cell])
       break
     case 'town': {
       const town = village(order.village)

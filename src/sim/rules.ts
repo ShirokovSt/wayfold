@@ -47,6 +47,8 @@ export const ESTATE_RADIUS = 3
 export const GOLD_PER_TILE = 0.05 // gold per second for every own tile, wherever it is
 
 export const BUILDING_COST: Record<BuildingKind, number> = { farm: 30, tower: 45 }
+export const SELL_SHARE = 0.5 // a building torn down gives back this share of its price
+export const CLEAR_COST = 15 // cutting down an own forest: half a farm, so a farm there costs as much as a tower
 export const FARM_GROWTH = 0.25 // extra people per second for the village whose estate has the farm
 export const TOWN_COST = 60 // a village upgraded to a town...
 export const TOWN_GROWTH = 0.67 // ...grows slower...

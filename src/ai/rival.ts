@@ -1,6 +1,6 @@
 import { hexDistance } from '../core/hex'
 import type { Random } from '../core/rng'
-import { type Project, build, canBuild, costOf, upgradeToTown } from '../sim/economy'
+import { type Project, build, canBuild, canClear, clearForest, costOf, upgradeToTown } from '../sim/economy'
 import { packTarget } from '../sim/beasts'
 import { estateBuildings, estateTiles } from '../sim/estates'
 import { findPath, pathDuration } from '../sim/pathfind'
@@ -92,13 +92,14 @@ export class Rival {
 
   // A farm at the capital first, then the capital becomes a town once it has a few villages, a tower at the front,
   // farms for the other villages and then second farms; with gold to spare, more towns, the front ones first,
-  // where soldiers are needed. It saves up for the first plan with a free spot
+  // where soldiers are needed. It saves up for the first plan with a free spot;
+  // a village with no field left for a farm has a forest of its estate cut down first
   private develop(world: World): void {
     const villages = this.villages(world)
     const capital = villages.find((v) => v.capital)
     const front = this.frontVillage(world)
     const farms = (village: Village) => estateBuildings(world, village, 'farm').length
-    const plans: [Village, Project][] = []
+    const plans: [Village, BuildingKind | 'town'][] = []
     if (capital && farms(capital) === 0) plans.push([capital, 'farm'])
     if (capital && villages.length >= 3 && !capital.town) plans.push([capital, 'town'])
     if (front && estateBuildings(world, front, 'tower').length === 0) plans.push([front, 'tower'])
@@ -117,6 +118,11 @@ export class Rival {
         return
       }
       const spot = this.buildSpot(world, village, kind)
+      const forest = !spot && kind === 'farm' ? this.forestSpot(world, village) : null
+      if (forest) {
+        clearForest(world, this.player, forest)
+        return
+      }
       if (!spot) continue
       if (world.gold[this.player] >= costOf(kind)) build(world, this.player, spot, kind)
       return
@@ -132,6 +138,13 @@ export class Rival {
         ? Math.min(...enemy.map((e) => hexDistance(e.cell.hex, cell.hex)))
         : hexDistance(village.cell.hex, cell.hex)
     return spots.sort((a, b) => score(a) - score(b))[0] ?? null
+  }
+
+  // The forest of the estate nearest the village, to make room for a farm
+  private forestSpot(world: World, village: Village): Cell | null {
+    const distance = (cell: Cell) => hexDistance(village.cell.hex, cell.hex)
+    const forests = estateTiles(world, village).filter((cell) => canClear(world, this.player, cell))
+    return forests.sort((a, b) => distance(a) - distance(b))[0] ?? null
   }
 
   // The own village closest to the enemy
