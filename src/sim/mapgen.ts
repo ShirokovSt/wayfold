@@ -49,24 +49,38 @@ export const DEFAULT_SETTINGS: MapSettings = { size: 'medium', type: 'random', s
 // Each map type is a share of land and a "bias" that raises or lowers the land by position:
 // u and v go from -1 to 1 across the map, the players start near u = -0.7 and u = 0.7
 // Heights are 2 × noise + bias, so a bias of about 1 decides the shape and less only nudges it
-const SHAPES: Record<MapType, { land: number; detail: number; bias: (u: number, v: number) => number }> = {
+interface Shape {
+  land: number
+  detail: number
+  bias: (u: number, v: number) => number
+}
+// Islands and lakes have a shape of their own for each map, see archipelago and lakeland
+const SHAPES: Record<'continent' | 'peninsulas', Shape> = {
   continent: { land: 0.86, detail: 0.12, bias: (u, v) => -1.2 * edge(u, v) },
-  lakes: { land: 0.78, detail: 0.2, bias: (u, v) => -0.3 * edge(u, v) },
   peninsulas: { land: 0.56, detail: 0.14, bias: (u, v) => 1.4 * Math.abs(u) - 1.1 * v * v - edge(0, v) },
-  islands: { land: 0.45, detail: 0.3, bias: (u, v) => -0.5 * edge(u, v) },
 }
 // With three players standing in a triangle, each gets a peninsula of the same shape around a sea in the middle
 const TRIANGLE = [[-0.4, -0.6], [0.4, -0.6], [0, 0.6]]
 const THREE_PENINSULAS = {
   ...SHAPES.peninsulas,
-  bias: (u: number, v: number) => 1.2 - 2.4 * Math.min(...TRIANGLE.map(([x, y]) => Math.hypot(u - x, v - y))) - 0.6 * edge(u, v),
+  bias: (u: number, v: number) =>
+    1.2 - 2.4 * Math.min(...TRIANGLE.map(([x, y]) => Math.hypot(u - x, v - y))) - 0.6 * edge(u, v)
+    - 1.5 * Math.max(0, 1 - Math.hypot(u, v + 0.2) / 0.45), // the sea, deeper around the middle of the triangle
 }
 
 const UP_LEFT: Hex = { q: 0, r: -1 }
 const UP_RIGHT: Hex = { q: 1, r: -1 }
 const MIN_VILLAGE_GAP = 3
 const MIN_CAPITAL_GAP = 6
+const THIRD_TRIES = 8 // spots for the first two capitals of three tried before the map is given up
+const NEUTRAL_TRIES = 10 // ways to scatter the neutral villages tried before the map is given up
 const SMALLEST_ISLAND = 4 // smaller bits of land sink back into the sea
+const CELLS_PER_ISLAND = 55 // of the whole map, water included
+const ISLAND_GAP = 8 // the least distance between the middles of two islands, in hex radii
+const STRAIT = 4 // how far from the sea between two islands their land is fully raised, in hex radii
+const CELLS_PER_LAKE = 40
+const LAKE_GAP = 6 // the least distance between the middles of two lakes, or of a lake and a capital
+const LAKE_SIZE = 4 // how far from its middle the land sinks into a lake
 
 // Some random maps are unplayable (a village walled in by mountains), so we try the next seed
 export function createWorld(seed: number, settings: MapSettings = DEFAULT_SETTINGS): World {
@@ -86,7 +100,10 @@ function tryCreateWorld(
   const { width, height } = MAP_DIMENSIONS[size]
   const map = new GameMap(width, height)
   const images = symmetry(map, players)
-  raiseLand(map, random, type === 'peninsulas' && players === 3 ? THREE_PENINSULAS : SHAPES[type])
+  const shape = type === 'islands' ? archipelago(map, players, createRandom(seed + 4243))
+    : type === 'lakes' ? lakeland(map, players, createRandom(seed + 4243))
+    : type === 'peninsulas' && players === 3 ? THREE_PENINSULAS : SHAPES[type]
+  raiseLand(map, random, shape)
   // Every player gets the same land: each tile is copied onto its images, the river too
   for (const cell of map.cells) {
     const all = images(cell)
@@ -171,7 +188,7 @@ function freezeInlandWater(map: GameMap, river: Cell[]): void {
 }
 
 // Heights from noise plus the map type's bias; the lowest part becomes sea, the highest mountains
-function raiseLand(map: GameMap, random: Random, shape: (typeof SHAPES)[MapType]): void {
+function raiseLand(map: GameMap, random: Random, shape: Shape): void {
   const heightNoise = createNoise(random)
   const forestNoise = createNoise(random)
   const center = mapCenter(map)
@@ -188,6 +205,79 @@ function raiseLand(map: GameMap, random: Random, shape: (typeof SHAPES)[MapType]
     else if (heights[i] >= mountainLevel) cell.terrain = 'mountain'
     else cell.terrain = forestNoise(x * 0.25 + 40, y * 0.25) > 0.58 ? 'forest' : 'field'
   })
+}
+
+// Islands grow around a few spots: one under each capital, the rest at random.
+// Land rises near a spot and sinks where the land of two spots meets, so the sea parts the islands
+function archipelago(map: GameMap, players: number, random: Random): Shape {
+  const { point, capitals, scatter } = spotsOn(map, players)
+  // Three get an island in the middle too, which the ways between all of them cross alike
+  const fixed = [...capitals, ...(players === 3 ? [point(0, 0)] : [])]
+  const spots = [...fixed, ...scatter(random, fixed, Math.round(map.cells.length / CELLS_PER_ISLAND) - fixed.length, ISLAND_GAP, 0.85)]
+  return {
+    land: 0.5,
+    detail: 0.2,
+    bias: (u, v) => {
+      const { x, y } = point(u, v)
+      const [nearest, next] = spots.map((spot) => Math.hypot(x - spot.x, y - spot.y)).sort((a, b) => a - b)
+      return 1.6 * Math.min(1, (next - nearest) / STRAIT) - 0.6 * edge(u, v)
+    },
+  }
+}
+
+// Lakes lie in hollows at a few spots away from the capitals, where the land sinks first
+function lakeland(map: GameMap, players: number, random: Random): Shape {
+  const { point, capitals, scatter } = spotsOn(map, players)
+  // Kept off the coast, so the sea does not swallow them
+  const lakes = scatter(random, capitals, Math.round(map.cells.length / CELLS_PER_LAKE), LAKE_GAP, 0.6)
+  return {
+    land: 0.8,
+    detail: 0.2,
+    bias: (u, v) => {
+      const { x, y } = point(u, v)
+      const nearest = Math.min(...lakes.map((lake) => Math.hypot(x - lake.x, y - lake.y)))
+      return -2 * Math.max(0, 1 - nearest / LAKE_SIZE) - 0.3 * edge(u, v)
+    },
+  }
+}
+
+interface Point {
+  x: number
+  y: number
+}
+
+// Spots on the map in hex radii: where the capitals stand, and more at random, mirrored like the map
+// so that every player gets the same; scattered ones keep a gap from each other and from the ones taken
+function spotsOn(map: GameMap, players: number) {
+  const center = mapCenter(map)
+  const point = (u: number, v: number): Point => ({ x: (u + 1) * center.x, y: (v + 1) * center.y })
+  const images = (u: number, v: number) =>
+    (players === 4 ? [[u, v], [-u, v], [u, -v], [-u, -v]] : players === 3 ? [[u, v], [-u, v]] : [[u, v], [-u, -v]])
+      .map(([a, b]) => point(a, b))
+  const { u, v } = seat(map, players)
+  const capitals = [...images(u, v), ...(players === 3 ? [point(0, -v)] : [])]
+  const scatter = (random: Random, taken: Point[], count: number, gap: number, reach: number): Point[] => {
+    const spots: Point[] = []
+    const apart = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y) >= gap
+    for (let tries = 0; spots.length < count && tries < 300; tries++) {
+      const group = images((2 * random() - 1) * reach, (2 * random() - 1) * reach)
+      const others = [...taken, ...spots]
+      const fits = group.every((spot, i) => others.every((other) => apart(spot, other)) && group.slice(i + 1).every((other) => apart(spot, other)))
+      if (fits) spots.push(...group)
+    }
+    return spots
+  }
+  return { point, capitals, scatter }
+}
+
+// Where the first capital stands, as u and v from -1 to 1 across the map; the others are its images.
+// Three stand in a triangle with equal sides, as tall as the map allows and as far from the top edge as from
+// the bottom one, so none is cramped against the coast or nearer to both others than they are to each other
+function seat(map: GameMap, players: number): { u: number; v: number } {
+  const center = mapCenter(map)
+  const v = players === 2 ? 0 : players === 3 ? -0.6 : -0.55
+  const u = players === 3 ? -(1.2 * center.y) / Math.sqrt(3) / center.x : -0.7
+  return { u, v }
 }
 
 // On the mainland, a river from the map center up to the top edge, crossable only at fords
@@ -212,7 +302,7 @@ function carveRiver(map: GameMap, random: Random): Cell[] {
 }
 
 // Every piece of land must be reachable: tiny islands sink, bigger ones get a line of fords
-// to the largest landmass; changes are mirrored to keep the map fair
+// to the nearest other piece of land; changes are mirrored to keep the map fair
 function connectLand(map: GameMap, images: Images): void {
   const set = (cell: Cell, terrain: Cell['terrain']) => {
     for (const other of images(cell)) other.terrain = terrain
@@ -225,7 +315,9 @@ function connectLand(map: GameMap, images: Images): void {
       for (const cell of piece) set(cell, 'water')
       continue
     }
-    const [from, to] = closestPair(piece, pieces[0])
+    const [from, to] = pieces.slice(0, -1)
+      .map((other) => closestPair(piece, other))
+      .sort(([a, b], [c, d]) => hexDistance(a.hex, b.hex) - hexDistance(c.hex, d.hex))[0]
     for (const hex of hexLine(from.hex, to.hex)) {
       const cell = map.cellAt(hex)
       if (!cell) continue // the line can graze the short end of an odd row; the next round mends the gap
@@ -250,21 +342,18 @@ function placeVillages(map: GameMap, random: Random, images: Images, players: nu
     return Math.abs(x / center.x - 1 - u) + 0.5 * Math.abs(y / center.y - 1 - v)
   }
   const apart = (cell: Cell) => images(cell).every((other) => other === cell || hexDistance(cell.hex, other.hex) >= MIN_CAPITAL_GAP)
-  // Three stand in a triangle with equal sides, as tall as the map allows and as far from the top edge as from
-  // the bottom one, so none is cramped against the coast or nearer to both others than they are to each other
-  const row = players === 2 ? 0 : players === 3 ? -0.6 : -0.55
-  const column = players === 3 ? -(1.2 * center.y) / Math.sqrt(3) / center.x : -0.7
-  const capital = land
+  const { u: column, v: row } = seat(map, players)
+  const spotsNearSeat = land
     .filter((cell) => images(cell).length > 1 && apart(cell))
-    .sort((a, b) => off(a, column, row) - off(b, column, row))[0]
-  if (!capital) return null
-  const capitals = images(capital)
-  if (players === 3) {
-    // The third one stands on the middle line below, as many seconds' march from both as they are from each other
-    const march = (from: Cell, to: Cell) => {
-      const path = findPath(map, from, to)
-      return path ? pathDuration(map, path) : Infinity
-    }
+    .sort((a, b) => off(a, column, row) - off(b, column, row))
+  const march = (from: Cell, to: Cell) => {
+    const path = findPath(map, from, to)
+    return path ? pathDuration(map, path) : Infinity
+  }
+  // The third one stands on the middle line below, as many seconds' march from both as they are from each other.
+  // If no spot there is fair, the first two try the next spots near their own
+  const withThird = (capital: Cell): Cell[] | null => {
+    const capitals = images(capital)
     const across = march(capitals[0], capitals[1])
     const third = land
       .filter((cell) => images(cell).length === 1 && hexDistance(cell.hex, capital.hex) >= MIN_CAPITAL_GAP)
@@ -272,19 +361,32 @@ function placeVillages(map: GameMap, random: Random, images: Images, players: nu
       .slice(0, 20) // the spots nearest the ideal one: timing every march would be slow
       .map((cell) => ({ cell, gap: Math.abs(march(cell, capital) - across) }))
       .sort((a, b) => a.gap - b.gap)[0]
-    if (!third || third.gap > across * 0.15) return null
-    capitals.push(third.cell)
+    return third && third.gap <= across * 0.15 ? [...capitals, third.cell] : null
   }
+  const capitals = players === 3
+    ? spotsNearSeat.slice(0, THIRD_TRIES).map(withThird).find((found) => found !== null)
+    : spotsNearSeat[0] && images(spotsNearSeat[0])
+  if (!capitals || !fairLand(map, capitals)) return null
 
-  const spots: Cell[] = []
-  const taken = () => [...capitals, ...spots.flatMap(images)]
-  const gap = (cell: Cell) =>
-    Math.min(...[...taken(), ...images(cell).filter((other) => other !== cell)].map((other) => hexDistance(cell.hex, other.hex)))
-  while (taken().length < total) {
-    const candidates = Array.from({ length: 30 }, () => pick(random, land)).filter((cell) => gap(cell) >= MIN_VILLAGE_GAP)
-    if (candidates.length === 0) return null
-    spots.push(candidates.sort((a, b) => gap(b) - gap(a))[0])
+  const neutralSpots = (): Cell[] | null => {
+    const spots: Cell[] = []
+    const taken = () => [...capitals, ...spots.flatMap(images)]
+    const gap = (cell: Cell) =>
+      Math.min(...[...taken(), ...images(cell).filter((other) => other !== cell)].map((other) => hexDistance(cell.hex, other.hex)))
+    while (taken().length < total) {
+      const candidates = Array.from({ length: 30 }, () => pick(random, land)).filter((cell) => gap(cell) >= MIN_VILLAGE_GAP)
+      if (candidates.length === 0) return null
+      spots.push(candidates.sort((a, b) => gap(b) - gap(a))[0])
+    }
+    return spots
   }
+  // Neutral villages are scattered again until each capital has about as many near it as the others
+  let spots: Cell[] | null = null
+  for (let round = 0; round < NEUTRAL_TRIES && !spots; round++) {
+    const found = neutralSpots()
+    if (found && fairNeighbours(capitals, found.flatMap(images))) spots = found
+  }
+  if (!spots) return null
 
   const villages: Village[] = []
   const addVillage = (cell: Cell, owner: Owner, population: number) => {
@@ -301,20 +403,22 @@ function placeVillages(map: GameMap, random: Random, images: Images, players: nu
     const population = randomInt(random, NEUTRAL_GARRISON.min, NEUTRAL_GARRISON.max)
     for (const cell of images(spot)) addVillage(cell, null, population)
   }
-  if (!fairShares(map, villages, players)) return null
   for (const village of villages.slice(0, players)) claimAround(map, village, START_LAND_RADIUS)
   return villages
 }
 
-// Every capital has about as much land around it to grow on, and as many neutral villages nearby as the others,
-// so nobody starts with more; it matters with three, where the one on the middle line has land of its own
-function fairShares(map: GameMap, villages: Village[], players: number): boolean {
-  const capitals = villages.slice(0, players)
-  const land = capitals.map((capital) => map.within(capital.cell, ESTATE_RADIUS).filter(isLand).length)
-  if (Math.min(...land) < Math.max(...land) - 2) return false
+// Every capital has about as much land around it to grow on as the others, so nobody starts with more;
+// it matters with three, where the one on the middle line has land of its own
+function fairLand(map: GameMap, capitals: Cell[]): boolean {
+  const land = capitals.map((capital) => map.within(capital, ESTATE_RADIUS).filter(isLand).length)
+  return Math.min(...land) >= Math.max(...land) - 2
+}
+
+// ...and as many neutral villages nearby
+function fairNeighbours(capitals: Cell[], neutrals: Cell[]): boolean {
   const shares = capitals.map(() => 0)
-  for (const village of villages.slice(players)) {
-    const distances = capitals.map((capital) => hexDistance(capital.cell.hex, village.cell.hex))
+  for (const village of neutrals) {
+    const distances = capitals.map((capital) => hexDistance(capital.hex, village.hex))
     const closest = Math.min(...distances)
     const nearest = distances.flatMap((distance, i) => (distance === closest ? [i] : []))
     for (const i of nearest) shares[i] += 1 / nearest.length

@@ -52,6 +52,25 @@ describe('map generator', () => {
     expect(water('peninsulas')).toBeGreaterThan(water('continent'))
   })
 
+  it('parts the islands by sea, with fords across, for any number of players', () => {
+    for (const [size, players] of [['small', 2], ['medium', 3], ['large', 4]] as const) {
+      for (const seed of [1, 2, 3]) {
+        const { map, villages } = createWorld(seed, { size, type: 'islands', players })
+        expect(map.cells.some((cell) => cell.terrain === 'ford')).toBe(true)
+        // Without the fords, no capital can walk to another
+        for (const cell of map.cells) if (cell.terrain === 'ford') cell.terrain = 'water'
+        expect(findPath(map, villages[0].cell, villages[1].cell)).toBeNull()
+      }
+    }
+  })
+
+  it('has lakes inland on a map of lakes, more than the mainland has', () => {
+    // Water that does not reach the map edge, as in winter, when it freezes
+    const inland = (type: (typeof MAP_TYPES)[number], seed: number) =>
+      createWorld(seed, { size: 'medium', type, season: 'winter' }).map.cells.filter((c) => c.terrain === 'ice').length
+    for (const seed of [1, 2, 3]) expect(inland('lakes', seed)).toBeGreaterThan(inland('continent', seed) + 10)
+  })
+
   it('on the mainland, the way between capitals crosses the river at a ford', () => {
     const { map, villages } = createWorld(3, { size: 'small', type: 'continent' })
     const path = findPath(map, villages[0].cell, villages[1].cell)!
