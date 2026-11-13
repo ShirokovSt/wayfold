@@ -224,9 +224,16 @@ for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, () 
 // Fixed-step simulation: ticks run at the same rate whatever the frame rate is
 let lastTime = performance.now()
 let pending = 0
+let stride = 0 // seconds the walkers have walked: their steps stop with the match
+
+// Paused or over, the world stands still: it is drawn as of the last tick, not between that one and the next
+function running(): boolean {
+  return !game.paused && game.world.winner === null
+}
 
 function frame(now: number): void {
   requestAnimationFrame(frame) // first, so one failed frame does not stop the game
+  if (running()) stride += (now - lastTime) / 1000
   pending = Math.min(pending + (now - lastTime) * game.speed, MAX_FRAME_MS)
   lastTime = now
   while (pending >= TICK_MS) {
@@ -239,13 +246,14 @@ function frame(now: number): void {
   }
   card.update()
   tutorial.update(game.world, game.paused)
-  renderer.draw(game.paused ? 1 : pending / TICK_MS, now / 1000, {
+  renderer.draw(running() ? pending / TICK_MS : 1, now / 1000, {
     drag: input.drag,
     hover: input.hover,
     selected: card.cell,
     focus: card.village,
     showRoutes: game.paused,
     marked: tutorial.marked(game.world),
+    stride,
   })
   hud.update()
   replayBar.update()

@@ -4,12 +4,12 @@ import { type Project, build, canBuild, canClear, clearForest, costOf, upgradeTo
 import { packTarget } from '../sim/beasts'
 import { estateBuildings, estateTiles } from '../sim/estates'
 import { findPath, pathDuration } from '../sim/pathfind'
-import { LAIR_BOUNTY, PACK_GROWTH, POPULATION_CAP } from '../sim/rules'
-import { type Share, sendSquad, squadCell, squadSize, squadTarget } from '../sim/squads'
+import { LAIR_BOUNTY, PACK_GROWTH, POPULATION_CAP, moveCost } from '../sim/rules'
+import { type Share, isStanding, redirectSquad, sendSquad, squadCell, squadSize, squadTarget } from '../sim/squads'
 import { isOut } from '../sim/tick'
-import { isGuarded } from '../sim/towers'
+import { canTake, isGuarded } from '../sim/towers'
 import { growthRate, strengthOf } from '../sim/villages'
-import { type BuildingKind, type Cell, type Owner, type PlayerId, type Village, type World, isEnemy } from '../sim/world'
+import { type BuildingKind, type Cell, type Owner, type PlayerId, type Squad, type Village, type World, isEnemy } from '../sim/world'
 
 export type Difficulty = 'easy' | 'normal' | 'hard'
 export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard']
@@ -43,6 +43,7 @@ interface Target {
 const BIG_VILLAGE = 20 // people: worth turning into a town even away from the front
 const WILD_LOSSES = 3 // people a squad may lose to bites on its way to a den
 const TOWER_LOSSES = 1.5 // a squad under a tower's volleys needs about half as many again
+const HUNT_PARTIES = 2 // villages sending hunters at a homeless squad, so it is caught between them
 
 // Like the player, the rival sends either half of a village's people or all of them
 interface Sender {
@@ -70,6 +71,7 @@ const PROFILES: Record<Difficulty, Profile> = {
 export class Rival {
   private readonly profile: Profile
   private timer: number
+  private readonly hunters = new Map<Squad, Squad>() // own squads sent after a homeless enemy squad, and their prey
 
   constructor(
     private readonly player: PlayerId,
@@ -81,13 +83,68 @@ export class Rival {
   }
 
   update(world: World, dt: number): void {
+    this.chase(world) // hunters keep an eye on their prey all the time, not just on the rival's moves
     this.timer -= dt
     if (this.timer > 0) return
     this.timer = this.profile.think * (0.8 + this.random() * 0.4)
     const noticesAttack = this.profile.defendChance >= 1 || this.random() < this.profile.defendChance
     const defended = noticesAttack && this.defend(world)
-    if (!defended && !this.capture(world)) this.raid(world)
+    if (!defended && !this.hunt(world) && !this.capture(world)) this.raid(world)
     this.develop(world)
+    this.leadHomeless(world)
+  }
+
+  // An enemy with no village left is kept in the match only by squads on the map: they are hunted down
+  // from the nearest villages, from two sides where it can, with enough strength to win
+  private hunt(world: World): boolean {
+    const housed = new Set(world.villages.map((village) => village.owner))
+    const preys = world.squads.filter((squad) => isEnemy(squad.owner, this.player) && !housed.has(squad.owner))
+    for (const prey of preys) {
+      const cell = squadCell(prey)
+      const chasing = [...this.hunters].filter(([, other]) => other === prey).reduce((sum, [hunter]) => sum + power(hunter), 0)
+      const needed = power(prey) + this.profile.margin - chasing
+      if (needed <= 0) continue
+      const near = this.villages(world).sort((a, b) => hexDistance(a.cell.hex, cell.hex) - hexDistance(b.cell.hex, cell.hex))
+      const group: [Village, Share][] = []
+      let strength = 0
+      for (const from of near) {
+        const share = this.shares(world, from).at(-1)
+        if (!share || (strength >= needed && group.length >= HUNT_PARTIES)) continue
+        group.push([from, share])
+        strength += this.power(from, share)
+      }
+      if (strength < needed) continue
+      for (const [from, share] of group) {
+        const hunter = sendSquad(world, this.player, from, interception(world, from.cell, prey), share)
+        if (hunter) this.hunters.set(hunter, prey)
+      }
+      return true
+    }
+    return false
+  }
+
+  // Hunters cut their prey off instead of trailing behind it, until one of them falls
+  private chase(world: World): void {
+    for (const [hunter, prey] of this.hunters) {
+      if (!world.squads.includes(hunter) || !world.squads.includes(prey)) {
+        this.hunters.delete(hunter)
+        continue
+      }
+      const cell = interception(world, squadCell(hunter), prey)
+      if (squadTarget(hunter) !== cell) redirectSquad(world, this.player, hunter, cell)
+    }
+  }
+
+  // Squads with no village left to walk to go for the easiest village near them: one they can move into,
+  // the weakest and closest; with none they still attack, rather than stand and wait forever
+  private leadHomeless(world: World): void {
+    for (const squad of world.squads.filter((squad) => squad.owner === this.player && isStanding(squad))) {
+      const from = squadCell(squad)
+      const score = (village: Village) =>
+        (canTake(world, squad, village.cell) ? 0 : 1000) + village.population * strengthOf(village) + hexDistance(from.hex, village.cell.hex)
+      const targets = world.villages.filter((village) => village.owner !== this.player).sort((a, b) => score(a) - score(b))
+      targets.find((village) => redirectSquad(world, this.player, squad, village.cell))
+    }
   }
 
   // A farm at the capital first, then the capital becomes a town once it has a few villages, a tower at the front,
@@ -321,6 +378,25 @@ export class Rival {
   private villages(world: World): Village[] {
     return world.villages.filter((village) => village.owner === this.player)
   }
+}
+
+function power(squad: Squad): number {
+  return squad.count * squad.strength
+}
+
+// Where a hunter setting off from the cell meets the prey: the first tile on the prey's way that the hunter
+// gets to no later than the prey does, so the two walk into each other. A hunter too far behind
+// waits for it where it is going; villages on the way are left out, as walking in would be an attack
+function interception(world: World, from: Cell, prey: Squad): Cell {
+  if (isStanding(prey)) return prey.path[0]
+  const season = world.map.season
+  const ahead = prey.path.slice(prey.step + 1).filter((cell) => !cell.village)
+  let time = -prey.progress * moveCost(season, prey.path[prey.step + 1].terrain)
+  for (const cell of ahead) {
+    time += moveCost(season, cell.terrain)
+    if (hexDistance(from.hex, cell.hex) * moveCost(season, 'field') <= time) return cell
+  }
+  return ahead.at(-1) ?? squadCell(prey)
 }
 
 // The strength of squads heading to the cell whose owner matches

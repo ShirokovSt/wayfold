@@ -58,6 +58,39 @@ describe('squads', () => {
     expect(world.map.cellAtOffset(4, 0)!.owner).toBe(HUMAN)
   })
 
+  it('with no village left stay where the raid ended and keep you in the match', () => {
+    const world = handmadeWorld(FIELD)
+    const home = addVillage(world, 0, 0, HUMAN, 5)
+    addVillage(world, 6, 2, RIVAL, 1)
+    const target = world.map.cellAtOffset(3, 0)!
+    const squad = sendSquad(world, HUMAN, home, target)!
+    home.owner = RIVAL
+    run(world, 10)
+    expect(world.squads).toEqual([squad])
+    expect(squad.path).toEqual([target])
+    expect(world.winner).toBeNull()
+
+    const next = world.map.cellAtOffset(5, 1)!
+    expect(redirectSquad(world, HUMAN, squad, next)).toBe(true)
+    run(world, 3 / SQUAD_SPEED)
+    expect(next.owner).toBe(HUMAN)
+  })
+
+  it('walking home to a lost village turn to another one of yours instead of attacking it', () => {
+    const world = handmadeWorld(FIELD)
+    const home = addVillage(world, 0, 0, HUMAN, 5)
+    const other = addVillage(world, 0, 2, HUMAN, 1)
+    addVillage(world, 6, 2, RIVAL, 1)
+    const squad = sendSquad(world, HUMAN, home, world.map.cellAtOffset(3, 0)!)!
+    run(world, 3.5 / SQUAD_SPEED) // there and halfway back
+    expect(squad.returning).toBe(true)
+    home.owner = RIVAL
+    run(world, 10)
+    expect(world.squads).toHaveLength(0)
+    expect(other.population).toBeGreaterThan(5)
+    expect(home.owner).toBe(RIVAL)
+  })
+
   it('cannot be sent from someone else’s village', () => {
     const world = handmadeWorld(FIELD)
     const enemy = addVillage(world, 0, 0, RIVAL, 10)

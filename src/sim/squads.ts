@@ -1,4 +1,4 @@
-import { hexDistance, hexToPoint } from '../core/hex'
+import { SQRT3, hexDistance, hexToPoint } from '../core/hex'
 import { fightLair } from './beasts'
 import { findPath } from './pathfind'
 import { CAPTURE_LAND_RADIUS, CLASH_DISTANCE, SQUAD_SPEED, moveCost } from './rules'
@@ -27,7 +27,7 @@ export function sendSquad(world: World, player: PlayerId, from: Village, to: Cel
   const { x, y } = hexToPoint(from.cell.hex, 1)
   const squad: Squad = {
     id: world.nextId++, owner: player, count, strength, path, step: 0, progress: 0,
-    home: from, start: null, x, y, prevX: x, prevY: y,
+    home: from, returning: false, start: null, x, y, prevX: x, prevY: y,
   }
   world.squads.push(squad)
   world.orders.push({ at: world.ticks, player, kind: 'send', from: from.cell.index, to: to.index, share })
@@ -41,12 +41,28 @@ export function redirectSquad(world: World, player: PlayerId, squad: Squad, to: 
   // Sent back to the tile it stands on, it just walks to the tile's center
   const path = from === to ? [from, from] : findPath(world.map, from, to)
   if (!path || path.length < 2) return false
-  squad.path = path
-  squad.step = 0
-  squad.progress = 0
-  squad.start = { x: squad.x, y: squad.y }
+  turn(squad, path)
   world.orders.push({ at: world.ticks, player, kind: 'redirect', squad: squad.id, to: to.index })
   return true
+}
+
+// Sets off on a new path from where the squad is right now. The way to the next tile center is mostly
+// shorter than a whole step, so the step starts partly done, as if from a tile back on the same line:
+// the squad keeps its pace however often it turns
+function turn(squad: Squad, path: Cell[], returning = false): void {
+  const to = hexToPoint((path[1] ?? path[0]).hex, 1)
+  const left = Math.min(1, Math.hypot(to.x - squad.x, to.y - squad.y) / SQRT3) // of a step
+  const back = left > 0 ? 1 / left : 0
+  squad.path = path
+  squad.step = 0
+  squad.progress = 1 - left
+  squad.start = { x: to.x + (squad.x - to.x) * back, y: to.y + (squad.y - to.y) * back }
+  squad.returning = returning
+}
+
+// Has no village to walk to and waits on its tile for orders
+export function isStanding(squad: Squad): boolean {
+  return squad.path.length === 1
 }
 
 // The tile the squad is standing on: it steps onto the next one halfway there
@@ -63,6 +79,9 @@ export function moveSquads(world: World, dt: number): void {
   for (const squad of [...world.squads]) {
     squad.prevX = squad.x
     squad.prevY = squad.y
+    if (isStanding(squad)) continue
+    // Its home fell while it was walking back: it stops at the nearest tile and looks for another one
+    if (squad.returning && squad.home.owner !== squad.owner) turn(squad, [squadCell(squad), squadCell(squad)])
     squad.progress += (SQUAD_SPEED * dt) / moveCost(world.map.season, squad.path[squad.step + 1].terrain)
     if (squad.progress >= 1) {
       squad.step++
@@ -109,17 +128,12 @@ function arrive(world: World, squad: Squad): void {
     removeSquad(world, squad)
     return
   }
-  // A raid ends on open land, or at a cleared den, and the squad walks back home
+  // A raid ends on open land, or at a cleared den, and the squad walks back home;
+  // with no village of its own left to reach it stays there, still yours to lead
   const home = squad.home.owner === squad.owner ? squad.home : nearestVillage(world, cell, squad.owner)
   const path = home && findPath(world.map, cell, home.cell)
-  if (!home || !path) {
-    removeSquad(world, squad)
-    return
-  }
-  squad.home = home
-  squad.path = path
-  squad.step = 0
-  squad.progress = 0
+  if (home) squad.home = home
+  turn(squad, path ?? [cell], path !== null)
   squad.start = null
 }
 

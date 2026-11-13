@@ -1,5 +1,5 @@
 import type { Drag } from '../input/pointer'
-import { squadSize } from '../sim/squads'
+import { isStanding, squadSize } from '../sim/squads'
 import { ARROW_SECONDS } from '../sim/towers'
 import { BITE_SECONDS } from '../sim/beasts'
 import { type Bite, type Cell, HUMAN, type Pack, type Squad, type Village, type World } from '../sim/world'
@@ -31,6 +31,7 @@ export interface View {
   focus: Village | null // the village the card is about, or whose estate its tile is in
   showRoutes: boolean // on pause: where your squads are heading
   marked: Cell[] // tiles the tutorial points at
+  stride: number // seconds of walking: squads and wolves stand still while the match is paused or over
 }
 
 export class Renderer {
@@ -141,10 +142,10 @@ export class Renderer {
     // Squads and packs together, the lower ones in front
     const walkers = [...this.world.squads, ...this.world.packs].sort((a, b) => a.y - b.y)
     for (const walker of walkers) {
-      if ('owner' in walker) this.drawSquad(walker, alpha, time)
-      else this.drawPack(walker, alpha, time)
+      if ('owner' in walker) this.drawSquad(walker, alpha, view.stride)
+      else this.drawPack(walker, alpha, view.stride)
     }
-    for (const bite of this.world.bites) this.drawBite(bite, alpha, time)
+    for (const bite of this.world.bites) this.drawBite(bite, alpha, view.stride)
     for (const arrow of this.world.arrows) {
       const from = this.layout.toScreen(arrow.from.x, arrow.from.y)
       from.y -= size * TOWER_TOP
@@ -186,7 +187,7 @@ export class Renderer {
     )
     const walkers = FORMATION.slice(0, squad.count).sort((a, b) => a.y - b.y)
     walkers.forEach((spot, i) => {
-      const phase = time * 9 + i * 1.7 + squad.id
+      const phase = isStanding(squad) ? 0 : time * 9 + i * 1.7 + squad.id // a phase of 0 stands still
       drawPerson(this.ctx, x + spot.x * size, y + spot.y * size + size * 0.15, size, tone, phase, squad.strength > 1)
     })
     // Soldiers from a town carry a dark plate, so they are told apart from peasants even when the map is small

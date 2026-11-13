@@ -90,10 +90,11 @@ export interface Squad {
   readonly owner: PlayerId
   count: number
   strength: number // what one member is worth in a fight: soldiers from a town count double
-  path: Cell[] // from the start cell to the destination
+  path: Cell[] // from the start cell to the destination; a single cell for a squad standing and waiting for orders
   step: number // index in path of the cell the squad is leaving
   progress: number // 0..1 on the way from path[step] to path[step + 1]
   home: Village // where the squad returns after a raid
+  returning: boolean // walking home after a raid, not on an order
   start: Point | null // where a redirected squad set off from, instead of the center of path[0]
   // Position in hex radii (as hexToPoint with size 1); the previous tick's one lets the renderer move squads smoothly
   x: number
