@@ -9,10 +9,13 @@ import { HUMAN, RIVAL } from '../sim/world'
 import { describeTile, linkedVillage, villageName } from './tileInfo'
 
 describe('village names', () => {
-  it('are spelled in both languages from the same parts', () => {
+  it('are spelled in both languages, each root with names no other root has', () => {
     for (const strings of [en, ru]) {
-      expect(strings.villageRoots).toHaveLength(NAME_ROOTS)
-      expect(strings.villageEndings).toHaveLength(NAME_ENDINGS)
+      const byRoot = Array.from({ length: NAME_ROOTS }, (_, root) =>
+        new Set(Array.from({ length: NAME_ENDINGS }, (_, ending) => strings.villageName(root * NAME_ENDINGS + ending))))
+      for (const names of byRoot) for (const name of names) expect(name).toMatch(/^\S.*\S$/)
+      const all = byRoot.flatMap((names) => [...names])
+      expect(new Set(all).size).toBe(all.length)
     }
   })
 

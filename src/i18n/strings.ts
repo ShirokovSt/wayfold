@@ -2,6 +2,7 @@ import type { Difficulty } from '../ai/rival'
 import type { Project } from '../sim/economy'
 import type { Beasts, MapSize, MapType, Season } from '../sim/world'
 import type { StepId } from '../tutorial/tutorial'
+import { englishVillageName, russianVillageName } from './villageNames'
 
 export const en = {
   title: 'Wayfold',
@@ -37,13 +38,7 @@ export const en = {
   lairName: "Wolves' den",
   lairPack: 'Wolves in the pack',
   lairBounty: 'Clear it for 40 gold',
-  villageRoots: [
-    'Birch', 'Pine', 'Alder', 'Ash', 'Oak', 'Lind', 'Maple', 'Rowan', 'Elm', 'Willow',
-    'Cedar', 'Hazel', 'Thorn', 'Apple', 'Stone', 'Moss', 'Hawk', 'Raven', 'Eagle', 'Fox',
-    'Bear', 'Beaver', 'Swan', 'Hill', 'Mead', 'Wade', 'Lake', 'Bridge', 'Corn', 'Honey',
-    'Star', 'Silver', 'Gold', 'White', 'Red', 'Black', 'Green', 'Still', 'Wind', 'Flint',
-  ],
-  villageEndings: ['wick', 'ford', 'ton', 'by', 'ham', 'field', 'stead', 'brook', 'dale', 'worth'],
+  villageName: englishVillageName,
   villageKinds: { village: 'village', town: 'town', capital: 'capital' },
   nobodysVillage: "Nobody's village",
   notGrowing: 'Does not grow',
@@ -195,13 +190,7 @@ export const ru: Strings = {
   lairName: 'Логово волков',
   lairPack: 'Волков в стае',
   lairBounty: 'За разорение — 40 золота',
-  villageRoots: [
-    'Берёз', 'Сосн', 'Ольх', 'Ясен', 'Дуб', 'Лип', 'Клен', 'Рябин', 'Вяз', 'Ив',
-    'Кедр', 'Орех', 'Терн', 'Яблон', 'Камен', 'Мох', 'Сокол', 'Ворон', 'Орл', 'Лис',
-    'Медвед', 'Бобр', 'Лебед', 'Холм', 'Луг', 'Брод', 'Озер', 'Мост', 'Колос', 'Мед',
-    'Звезд', 'Серебр', 'Злат', 'Бел', 'Красн', 'Черн', 'Зелен', 'Тих', 'Ветр', 'Кремн',
-  ],
-  villageEndings: ['овка', 'ово', 'ино', 'ица', 'ец', 'ня', 'ичи', 'ов', 'иха', 'ье'],
+  villageName: russianVillageName,
   villageKinds: { village: 'деревня', town: 'город', capital: 'столица' },
   nobodysVillage: 'Ничья деревня',
   notGrowing: 'Не растёт',

@@ -1,7 +1,6 @@
 import { hexDistance } from '../core/hex'
 import { currentLanguage, t } from '../i18n'
 import { estateTiles, estateVillage } from '../sim/estates'
-import { NAME_ENDINGS } from '../sim/names'
 import { ESTATE_RADIUS, FARM_GROWTH, GOLD_PER_TILE, HARVEST_GOLD, POPULATION_CAP, SEASON_GROWTH, TOWN_GROWTH } from '../sim/rules'
 import { isGuarded } from '../sim/towers'
 import { growthRate, strengthOf } from '../sim/villages'
@@ -22,8 +21,7 @@ export interface TileInfo {
 }
 
 export function villageName(village: Village): string {
-  const { villageRoots, villageEndings } = t()
-  return villageRoots[Math.floor(village.name / NAME_ENDINGS)] + villageEndings[village.name % NAME_ENDINGS]
+  return t().villageName(village.name)
 }
 
 // The village a tile is shown with: the one on it, or the one whose estate the tile is in
