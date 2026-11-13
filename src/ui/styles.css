@@ -608,6 +608,113 @@ button.primary:hover {
   color: #7d6a52;
 }
 
+/* Replays: the kept ones in a list, each with its result, its map and its buttons */
+
+.card.replays {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.card.replays .choices {
+  width: auto;
+  margin-bottom: 14px;
+}
+
+.replay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.replay-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e3d6ba;
+  border-radius: 10px;
+}
+
+.replay-text p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.replay-text p:first-child {
+  margin-bottom: 2px;
+  font-size: 15px;
+}
+
+.replay-text .won {
+  color: var(--you);
+}
+
+.replay-text .lost {
+  color: var(--rival);
+}
+
+.replay-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.card .replay-buttons button {
+  color: var(--ink);
+  background: transparent;
+  border-color: #c9b791;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.card .replay-buttons button.primary {
+  color: white;
+  background: var(--you);
+  border-color: #4e2a80;
+  padding: 4px 14px;
+}
+
+.card .replay-buttons button.danger {
+  color: white;
+  background: var(--rival);
+  border-color: #9c2f25;
+}
+
+.card .replay-buttons button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.card .replay-row .star {
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: #b59a6a;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.card .replay-row .star.active {
+  color: #d49b1c;
+}
+
+.notice {
+  color: var(--rival);
+  font-size: 13px;
+}
+
+@media (max-width: 560px) {
+  .replay-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .replay-buttons {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
 /* One grid for all rows, so every row of options starts at the same place */
 .choices {
   display: grid;

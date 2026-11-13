@@ -46,6 +46,9 @@ export class ReplayBar {
     if (!this.slider.matches(':active')) this.slider.value = String(game.world.ticks) // not under the dragging hand
     const text = `${formatTime(game.world.time)} / ${formatTime(length * TICK_SECONDS)}`
     if (this.time.textContent !== text) this.time.textContent = text
+    // A saved replay goes back to the list of replays, the match just played to its result
+    const exit = game.opened ? t().toReplays : t().toResults
+    if (this.exitButton.textContent !== exit) this.exitButton.textContent = exit
     const playing = !game.paused && game.world.winner === null
     if (playing !== this.playing) {
       this.playing = playing
@@ -57,7 +60,7 @@ export class ReplayBar {
   private showTexts(): void {
     this.label.textContent = t().replay
     this.slider.title = t().replayTime
-    this.exitButton.textContent = t().toResults
+    this.exitButton.textContent = '' // redone on the next frame, with the button's label
     this.playing = null // the button's label is redone on the next frame
   }
 }

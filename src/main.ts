@@ -8,11 +8,14 @@ import { currentLanguage, onLanguageChange, t } from './i18n'
 import { CameraControls } from './input/camera'
 import { PointerInput } from './input/pointer'
 import { Renderer } from './render/renderer'
+import { type Replay, canWatch, fromBytes } from './replays/format'
+import { type SavedReplay, loadReplay, saveReplay } from './replays/library'
 import { TICK_SECONDS } from './sim/rules'
 import type { Cell } from './sim/world'
 import { readStored, store } from './storage'
 import { Hud, PLAY_SPEED_LIMIT } from './ui/hud'
 import { ReplayBar } from './ui/replayBar'
+import { downloadReplay } from './ui/replayFiles'
 import { Screens } from './ui/screens'
 import { TileCard } from './ui/tileCard'
 import { TutorialPanel } from './ui/tutorialPanel'
@@ -100,6 +103,7 @@ function openMenu(): void {
   screens.menu({
     newMap: chooseNewMap,
     tutorial: startTutorial,
+    replays: () => openReplays(),
     settings: () => screens.settings(openMenu),
     continue: inMatch() ? continueMatch : undefined,
     tutorialFirst: readStored(TUTORIAL_KEY) === null,
@@ -177,10 +181,53 @@ function seek(ticks: number): void {
 
 function stopWatching(): void {
   card.close()
+  playSpeed()
+  if (game.opened) {
+    game.close()
+    openReplays()
+    return
+  }
   game.stopWatching()
   renderer.showWorld(game.world)
-  playSpeed()
   showEnd()
+}
+
+// The kept replays; Back goes to the menu, over the match if one is on
+function openReplays(notice: string | null = null): void {
+  if (!inMatch()) music.play('menu')
+  screens.replays({ watch: watchSaved, download: downloadSaved, open: openFile, back: openMenu }, notice)
+}
+
+function watchSaved(saved: SavedReplay): void {
+  loadReplay(saved.id).then(watchOpened, () => openReplays(t().badFile))
+}
+
+function downloadSaved(saved: SavedReplay): void {
+  loadReplay(saved.id).then(downloadReplay, () => openReplays(t().badFile))
+}
+
+// An opened file is kept with a star, and watched at once if this version of the game can play it
+async function openFile(file: File): Promise<void> {
+  try {
+    const replay = await fromBytes(new Uint8Array(await file.arrayBuffer()))
+    await saveReplay(replay, true)
+    if (canWatch(replay.info)) watchOpened(replay)
+    else openReplays()
+  } catch {
+    openReplays(t().badFile)
+  }
+}
+
+// A saved replay takes the place of the match, if one is on; it has no result card of its own to show
+function watchOpened(replay: Replay): void {
+  tutorial.stop()
+  card.close()
+  game.open(replay)
+  renderer.setWorld(game.world)
+  input.drag = null
+  endShown = true
+  music.play(game.world.map.season)
+  play()
 }
 
 // The fastest speeds are only for replays
@@ -261,6 +308,8 @@ function frame(now: number): void {
   const winner = game.world.winner
   if (winner !== null && !endShown) {
     endShown = true
+    const replay = game.replay() // none for the tutorial
+    if (replay) void saveReplay(replay)
     if (tutorial.active) {
       tutorial.stop()
       screens.tutorialDone(chooseNewMap, openMenu)

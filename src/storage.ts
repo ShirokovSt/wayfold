@@ -9,10 +9,20 @@ export function readStored(key: string): string | null {
   }
 }
 
-export function store(key: string, value: string): void {
+// False when it could not be saved, e.g. the storage is full: the choice is just forgotten on reload
+export function store(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value)
+    return true
   } catch {
-    // Not saved: the choice is just forgotten on reload
+    return false
+  }
+}
+
+export function forget(key: string): void {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // Nothing stored to remove
   }
 }

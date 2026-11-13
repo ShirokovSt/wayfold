@@ -2,9 +2,11 @@ import { DIFFICULTIES, type Difficulty, Rival } from './ai/rival'
 import { createRandom } from './core/rng'
 import { DEFAULT_SETTINGS, type MapSettings, createWorld } from './sim/mapgen'
 import { MAX_RIVALS } from './sim/rules'
+import { type Replay, newReplay } from './replays/format'
 import { Recording } from './sim/replay'
-import { tick } from './sim/tick'
-import { BEASTS, type Beasts, MAP_SIZES, MAP_TYPES, SEASONS, type Season, type World } from './sim/world'
+import { decodeStart, encodeStart, fingerprint } from './sim/snapshot'
+import { standings, tick } from './sim/tick'
+import { BEASTS, type Beasts, HUMAN, MAP_SIZES, MAP_TYPES, SEASONS, type Season, type World } from './sim/world'
 import { readStored, store } from './storage'
 import { tutorialWorld } from './tutorial/tutorial'
 
@@ -26,8 +28,11 @@ export class Game {
   started = false // false until a match is started from the menu
   speed = 1 // how many game seconds pass in a real second
   watching = false // the finished match is played again: no orders, the moves come from the recording
+  opened: Replay | null = null // a saved replay being watched, with no match of its own behind it
   private rivals: Rival[] = [] // none in the tutorial: the rival there only waits
   private recording!: Recording
+  private live!: World
+  private match: MatchSettings | null = null // what the match was started with; none for the tutorial
 
   constructor(seed: number) {
     this.restart(seed)
@@ -36,19 +41,52 @@ export class Game {
   restart(seed: number): void {
     const settings = this.settings
     this.begin(createWorld(seed, { ...settings, players: settings.rivals + 1 }))
+    this.match = settings
     this.rivals = this.world.players.slice(1).map((player, i) => new Rival(player, createRandom(seed + 1 + i * 7), settings.difficulty))
   }
 
   startTutorial(): void {
     this.begin(tutorialWorld())
-    this.rivals = []
+  }
+
+  // A saved replay, watched from the start
+  open(replay: Replay): void {
+    const start = decodeStart(replay.start)
+    this.begin(start)
+    this.recording = new Recording(start, replay.orders, () => replay.info.ticks)
+    this.opened = replay
+    this.started = true
+    this.watch()
+  }
+
+  // Leaves a saved replay; the board keeps its last moment, behind the menu
+  close(): void {
+    this.watching = false
+    this.started = false
+    this.paused = true
   }
 
   private begin(world: World): void {
     this.world = world
-    this.recording = new Recording(world)
+    this.live = world
+    this.recording = Recording.of(world)
     this.started = false
     this.watching = false
+    this.opened = null
+    this.match = null
+    this.rivals = []
+  }
+
+  // The finished match, to be kept and watched again later; none for the tutorial
+  replay(): Replay | null {
+    const live = this.live
+    if (!this.match || live.winner === null) return null
+    const info = {
+      savedAt: Date.now(), ticks: live.ticks, mapType: live.mapType, size: this.match.size, season: live.map.season,
+      players: live.players.length, difficulty: this.match.difficulty, beasts: this.match.beasts,
+      place: standings(live).indexOf(HUMAN) + 1, end: fingerprint(live),
+    }
+    return newReplay(info, encodeStart(this.recording.start), [...live.orders])
   }
 
   get replayLength(): number {
@@ -63,7 +101,7 @@ export class Game {
 
   stopWatching(): void {
     this.watching = false
-    this.world = this.recording.live
+    this.world = this.live
   }
 
   changeSettings(settings: MatchSettings): void {
@@ -79,7 +117,7 @@ export class Game {
     }
     for (const rival of this.rivals) rival.update(this.world, dt)
     tick(this.world, dt)
-    this.recording.update()
+    this.recording.note(this.world)
   }
 }
 

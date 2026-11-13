@@ -24,12 +24,12 @@ describe('a recording', () => {
   it('plays the match again the same way, from any moment', () => {
     const world = createWorld(5, { size: 'small', type: 'continent', beasts: 'many' })
     const players = [new Rival(HUMAN, createRandom(6), 'hard'), new Rival(RIVAL, createRandom(7), 'normal')]
-    const recording = new Recording(world)
+    const recording = Recording.of(world)
     const seen = new Map<number, ReturnType<typeof picture>>()
     while (world.winner === null && world.ticks < 6000) {
       for (const player of players) player.update(world, TICK_SECONDS)
       tick(world, TICK_SECONDS)
-      recording.update()
+      recording.note(world)
       if (world.ticks % 777 === 0) seen.set(world.ticks, picture(world))
     }
     expect(world.orders.length).toBeGreaterThan(20)

@@ -1,10 +1,14 @@
 import { version } from '../../package.json'
 import { music } from '../audio/music'
 import { sounds } from '../audio/sounds'
-import { onLanguageChange, t } from '../i18n'
+import { currentLanguage, onLanguageChange, t } from '../i18n'
 import { DIFFICULTIES } from '../ai/rival'
 import type { MatchSettings } from '../game'
-import { MAX_RIVALS } from '../sim/rules'
+import { REPLAY_EXTENSION, canWatch } from '../replays/format'
+import {
+  REPLAY_LIMITS, type SavedReplay, deleteReplay, replayLimit, savedReplays, setReplayLimit, starReplay,
+} from '../replays/library'
+import { MAX_RIVALS, TICK_SECONDS } from '../sim/rules'
 import { standings } from '../sim/tick'
 import { BEASTS, HUMAN, MAP_SIZES, MAP_TYPES, SEASONS, type World } from '../sim/world'
 import { ownerTone } from '../render/palette'
@@ -20,9 +24,17 @@ export interface MatchChoice {
 
 type Help = 'season' | 'beasts' | 'rivals'
 
+export interface ReplayActions {
+  watch(saved: SavedReplay): void
+  download(saved: SavedReplay): void
+  open(file: File): void
+  back(): void
+}
+
 export interface MenuActions {
   newMap(): void
   tutorial(): void
+  replays(): void
   settings(): void
   continue?: () => void // only while a match is on
   tutorialFirst: boolean // offered first until it has been played once
@@ -33,6 +45,7 @@ export class Screens {
   private content: (() => HTMLElement) | null = null
   private helpOpen: Help | null = null
   private onEscape: (() => void) | null = null
+  private deleting: string | null = null // the replay whose Delete was pressed once, waiting to be pressed again
 
   constructor(private readonly root: HTMLElement) {
     onLanguageChange(() => this.refresh())
@@ -48,7 +61,7 @@ export class Screens {
       const buttons = [button(t().newMap, actions.newMap), button(t().tutorial, actions.tutorial)]
       if (actions.tutorialFirst) buttons.reverse()
       if (actions.continue) buttons.unshift(button(t().continue, actions.continue))
-      buttons.push(button(t().settings, actions.settings))
+      buttons.push(button(t().replays, actions.replays), button(t().settings, actions.settings))
       buttons[0].classList.add('primary')
       return element(
         'div',
@@ -110,6 +123,73 @@ export class Screens {
           button(t().toMenu, onMenu),
         ),
       ),
+    )
+  }
+
+  // The kept replays, newest first, and how many of them to keep; a file can be opened too.
+  // The notice tells what went wrong, e.g. with an opened file
+  replays(actions: ReplayActions, notice: string | null = null): void {
+    this.deleting = null
+    this.show(actions.back, () => {
+      const list = savedReplays()
+      const limit = choiceRow(t().keepReplays, REPLAY_LIMITS.map((count) =>
+        [String(count), replayLimit() === count, () => {
+          setReplayLimit(count)
+          this.refresh()
+        }]))
+      const file = element('input', '')
+      file.type = 'file'
+      file.accept = REPLAY_EXTENSION
+      file.hidden = true
+      file.addEventListener('change', () => file.files?.[0] && actions.open(file.files[0]))
+      return element(
+        'div',
+        'card replays',
+        element('h2', '', t().replays),
+        element('div', 'choices', limit),
+        list.length > 0
+          ? element('div', 'replay-list', ...list.map((saved) => this.replayRow(saved, actions)))
+          : element('p', 'muted', t().noReplays),
+        ...(notice ? [element('p', 'notice', notice)] : []),
+        element('div', 'actions', button(t().openFile, () => file.click()), button(t().back, actions.back)),
+        file,
+      )
+    })
+  }
+
+  // The result and the map, when and how long; a star keeps it for good, and deleting asks once more
+  private replayRow(saved: SavedReplay, actions: ReplayActions): HTMLElement {
+    const info = saved.info
+    const star = button(saved.starred ? '★' : '☆', () => {
+      starReplay(saved.id, !saved.starred)
+      this.refresh()
+    }, `star${saved.starred ? ' active' : ''}`)
+    star.title = saved.starred ? t().unstarReplay : t().starReplay
+    const won = info.place === 1
+    const map = [t().mapTypes[info.mapType], t().mapSizes[info.size], t().seasons[info.season],
+      t().rivalCount(info.players - 1), t().difficulties[info.difficulty]].join(' · ')
+    const when = `${formatDate(info.savedAt)} · ${formatTime(info.ticks * TICK_SECONDS)}`
+    const watch = button(t().watch, () => actions.watch(saved), 'primary')
+    watch.disabled = !canWatch(info)
+    const confirm = this.deleting === saved.id
+    const remove = button(confirm ? t().deleteSure : t().deleteReplay, () => {
+      if (confirm) deleteReplay(saved.id)
+      this.deleting = confirm ? null : saved.id
+      this.refresh()
+    }, confirm ? 'danger' : '')
+    return element(
+      'div',
+      'replay-row',
+      star,
+      element(
+        'div',
+        'replay-text',
+        element('p', '', element('b', won ? 'won' : 'lost', won ? t().victory : t().defeat), ` · ${t().place(info.place, info.players)}`),
+        element('p', 'muted', map),
+        element('p', 'muted', when),
+        ...(canWatch(info) ? [] : [element('p', 'notice', t().otherVersion(info.version))]),
+      ),
+      element('div', 'replay-buttons', watch, button(t().download, () => actions.download(saved)), remove),
     )
   }
 
@@ -197,6 +277,11 @@ export class Screens {
     this.root.replaceChildren(this.content())
     this.root.hidden = false
   }
+}
+
+// The day and the time, as is usual in the language: "14 Nov, 15:30"
+function formatDate(time: number): string {
+  return new Date(time).toLocaleString(currentLanguage(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 function settingRow(label: string, control: HTMLElement): HTMLElement {

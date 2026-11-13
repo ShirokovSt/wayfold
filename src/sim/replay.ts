@@ -7,23 +7,38 @@ import type { Order, World } from './world'
 
 const CHECKPOINT_TICKS = 100 // a copy of the world every five seconds of the match
 
-// A match kept for watching again: copies of the world now and then, and the players' orders.
-// Any moment is rebuilt from the copy before it by playing the orders on to it, so the AI is not needed
+// A match kept for watching again: the world as it started, the players' orders, and copies of the world
+// now and then. Any moment is rebuilt from the copy before it by playing the orders on to it, so the AI is not needed.
+// The copies are made as the match gets that far, played or watched: a replay opened from a file starts with none
 export class Recording {
   private readonly checkpoints: World[] = []
 
-  constructor(readonly live: World) {
-    this.update()
+  constructor(
+    start: World,
+    readonly orders: Order[],
+    private readonly ticks: () => number, // how long the match is, so far
+  ) {
+    this.note(start)
   }
 
-  // Called after every tick of the live match. The copies leave the orders out: the replay reads them
-  // from the live match, and each copy would otherwise carry the whole log so far, about half its size
-  update(): void {
-    if (this.live.ticks % CHECKPOINT_TICKS === 0) this.checkpoints.push(copyWorld({ ...this.live, orders: [] }))
+  // A match being played: its orders and length grow as it goes on
+  static of(live: World): Recording {
+    return new Recording(live, live.orders, () => live.ticks)
   }
 
   get length(): number {
-    return this.live.ticks
+    return this.ticks()
+  }
+
+  // A copy of how the match started
+  get start(): World {
+    return copyWorld(this.checkpoints[0])
+  }
+
+  // Called after every tick, of the match or of its replay. The copies leave the orders out: the replay reads them
+  // from the recording, and each copy would otherwise carry the whole log so far, about half its size
+  note(world: World): void {
+    if (world.ticks === this.checkpoints.length * CHECKPOINT_TICKS) this.checkpoints.push(copyWorld({ ...world, orders: [] }))
   }
 
   // The match as it stood after this many ticks
@@ -36,8 +51,9 @@ export class Recording {
 
   // One tick of the replay: the orders given at this moment, then the world moves on
   step(world: World): void {
-    for (const order of this.live.orders) if (order.at === world.ticks) perform(world, order)
+    for (const order of this.orders) if (order.at === world.ticks) perform(world, order)
     tick(world, TICK_SECONDS)
+    this.note(world)
   }
 }
 
