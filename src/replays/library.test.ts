@@ -3,7 +3,7 @@ import { addVillage, handmadeWorld } from '../sim/handmade'
 import { encodeStart } from '../sim/snapshot'
 import { HUMAN, RIVAL } from '../sim/world'
 import { type Replay, newReplay } from './format'
-import { deleteReplay, loadReplay, replayLimit, saveReplay, savedReplays, setReplayLimit, starReplay } from './library'
+import { deleteReplay, droppedBy, loadReplay, replayLimit, saveReplay, savedReplays, setReplayLimit, starReplay } from './library'
 
 // The browser's storage, kept in memory; `room` is how many characters it holds
 function useStorage(room = Infinity): void {
@@ -52,6 +52,17 @@ describe('kept replays', () => {
     expect(times()).toEqual([8, 7, 6, 1])
     deleteReplay(savedReplays()[0].id)
     expect(times()).toEqual([7, 6, 1])
+  })
+
+  it('tell beforehand which ones a lower limit or a star taken off would delete', async () => {
+    for (let time = 1; time <= 5; time++) await saveReplay(replay(time))
+    const id = (time: number) => savedReplays().find((saved) => saved.info.savedAt === time)!.id
+    starReplay(id(1), true)
+    expect(droppedBy(2)).toEqual([id(3), id(2)])
+    expect(droppedBy(5, id(1))).toEqual([])
+    setReplayLimit(3)
+    expect(droppedBy(3, id(1))).toEqual([id(1)]) // older than the three kept
+    expect(times()).toEqual([5, 4, 3, 1]) // nothing is deleted just by asking
   })
 
   it('make room for a new one when the storage is full, the oldest unstarred going first', async () => {

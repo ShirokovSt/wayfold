@@ -675,12 +675,6 @@ button.primary:hover {
   padding: 4px 14px;
 }
 
-.card .replay-buttons button.danger {
-  color: white;
-  background: var(--rival);
-  border-color: #9c2f25;
-}
-
 .card .replay-buttons button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -702,6 +696,53 @@ button.primary:hover {
 .notice {
   color: var(--rival);
   font-size: 13px;
+}
+
+/* A question before replays are deleted, with Confirm and Cancel */
+
+.confirm-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f7dcd3;
+}
+
+.replay-row .confirm-bar {
+  margin: 0;
+}
+
+.confirm-bar p {
+  margin: 0;
+}
+
+.confirm-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.card .confirm-bar button {
+  color: var(--ink);
+  background: transparent;
+  border-color: #c9b791;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.card .confirm-bar button.danger {
+  color: white;
+  background: var(--rival);
+  border-color: #9c2f25;
+}
+
+.replay-row.dropping {
+  border-color: var(--rival);
+  background: #fbeee9;
 }
 
 @media (max-width: 560px) {

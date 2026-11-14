@@ -6,7 +6,7 @@ import { DIFFICULTIES } from '../ai/rival'
 import type { MatchSettings } from '../game'
 import { REPLAY_EXTENSION, canWatch } from '../replays/format'
 import {
-  REPLAY_LIMITS, type SavedReplay, deleteReplay, replayLimit, savedReplays, setReplayLimit, starReplay,
+  REPLAY_LIMITS, type SavedReplay, deleteReplay, droppedBy, replayLimit, savedReplays, setReplayLimit, starReplay,
 } from '../replays/library'
 import { MAX_RIVALS, TICK_SECONDS } from '../sim/rules'
 import { standings } from '../sim/tick'
@@ -23,6 +23,9 @@ export interface MatchChoice {
 }
 
 type Help = 'season' | 'beasts' | 'rivals'
+
+// Actions that would delete replays, so they are confirmed first
+type Pending = { kind: 'delete' | 'unstar'; id: string } | { kind: 'limit'; limit: number }
 
 export interface ReplayActions {
   watch(saved: SavedReplay): void
@@ -45,7 +48,7 @@ export class Screens {
   private content: (() => HTMLElement) | null = null
   private helpOpen: Help | null = null
   private onEscape: (() => void) | null = null
-  private deleting: string | null = null // the replay whose Delete was pressed once, waiting to be pressed again
+  private pending: Pending | null = null // an action on the replays that waits for Confirm or Cancel
 
   constructor(private readonly root: HTMLElement) {
     onLanguageChange(() => this.refresh())
@@ -129,14 +132,18 @@ export class Screens {
   // The kept replays, newest first, and how many of them to keep; a file can be opened too.
   // The notice tells what went wrong, e.g. with an opened file
   replays(actions: ReplayActions, notice: string | null = null): void {
-    this.deleting = null
+    this.pending = null
     this.show(actions.back, () => {
       const list = savedReplays()
+      const pending = this.pending
+      // A lower limit that would delete replays asks first
       const limit = choiceRow(t().keepReplays, REPLAY_LIMITS.map((count) =>
-        [String(count), replayLimit() === count, () => {
-          setReplayLimit(count)
-          this.refresh()
-        }]))
+        [String(count), replayLimit() === count, () => this.ask({ kind: 'limit', limit: count }, droppedBy(count).length > 0,
+          () => setReplayLimit(count))]))
+      const dropping = pending?.kind === 'limit' ? droppedBy(pending.limit) : []
+      const limitQuestion = pending?.kind === 'limit'
+        ? [this.confirmBar(t().limitDrops(pending.limit, dropping.length), () => setReplayLimit(pending.limit))]
+        : []
       const file = element('input', '')
       file.type = 'file'
       file.accept = REPLAY_EXTENSION
@@ -147,8 +154,9 @@ export class Screens {
         'card replays',
         element('h2', '', t().replays),
         element('div', 'choices', limit),
+        ...limitQuestion,
         list.length > 0
-          ? element('div', 'replay-list', ...list.map((saved) => this.replayRow(saved, actions)))
+          ? element('div', 'replay-list', ...list.map((saved) => this.replayRow(saved, actions, dropping.includes(saved.id))))
           : element('p', 'muted', t().noReplays),
         ...(notice ? [element('p', 'notice', notice)] : []),
         element('div', 'actions', button(t().openFile, () => file.click()), button(t().back, actions.back)),
@@ -157,13 +165,14 @@ export class Screens {
     })
   }
 
-  // The result and the map, when and how long; a star keeps it for good, and deleting asks once more
-  private replayRow(saved: SavedReplay, actions: ReplayActions): HTMLElement {
+  // The result and the map, when and how long; a star keeps it for good. Deleting asks first,
+  // and so does taking off a star when that leaves the replay beyond the limit
+  private replayRow(saved: SavedReplay, actions: ReplayActions, dropping: boolean): HTMLElement {
     const info = saved.info
-    const star = button(saved.starred ? '★' : '☆', () => {
-      starReplay(saved.id, !saved.starred)
-      this.refresh()
-    }, `star${saved.starred ? ' active' : ''}`)
+    const id = saved.id
+    const unstarDrops = saved.starred && droppedBy(replayLimit(), id).includes(id)
+    const star = button(saved.starred ? '★' : '☆', () =>
+      this.ask({ kind: 'unstar', id }, unstarDrops, () => starReplay(id, !saved.starred)), `star${saved.starred ? ' active' : ''}`)
     star.title = saved.starred ? t().unstarReplay : t().starReplay
     const won = info.place === 1
     const map = [t().mapTypes[info.mapType], t().mapSizes[info.size], t().seasons[info.season],
@@ -171,15 +180,18 @@ export class Screens {
     const when = `${formatDate(info.savedAt)} · ${formatTime(info.ticks * TICK_SECONDS)}`
     const watch = button(t().watch, () => actions.watch(saved), 'primary')
     watch.disabled = !canWatch(info)
-    const confirm = this.deleting === saved.id
-    const remove = button(confirm ? t().deleteSure : t().deleteReplay, () => {
-      if (confirm) deleteReplay(saved.id)
-      this.deleting = confirm ? null : saved.id
-      this.refresh()
-    }, confirm ? 'danger' : '')
+    const remove = button(t().deleteReplay, () => this.ask({ kind: 'delete', id }, true, () => deleteReplay(id)))
+    const pending = this.pending
+    const question = pending?.kind === 'delete' && pending.id === id ? t().deleteSure
+      : pending?.kind === 'unstar' && pending.id === id ? t().unstarDrops(replayLimit())
+      : null
+    const notes = [
+      ...(canWatch(info) ? [] : [element('p', 'notice', t().otherVersion(info.version))]),
+      ...(dropping ? [element('p', 'notice', t().willBeDeleted)] : []),
+    ]
     return element(
       'div',
-      'replay-row',
+      `replay-row${dropping ? ' dropping' : ''}`,
       star,
       element(
         'div',
@@ -187,9 +199,35 @@ export class Screens {
         element('p', '', element('b', won ? 'won' : 'lost', won ? t().victory : t().defeat), ` · ${t().place(info.place, info.players)}`),
         element('p', 'muted', map),
         element('p', 'muted', when),
-        ...(canWatch(info) ? [] : [element('p', 'notice', t().otherVersion(info.version))]),
+        ...notes,
       ),
       element('div', 'replay-buttons', watch, button(t().download, () => actions.download(saved)), remove),
+      ...(question ? [this.confirmBar(question, () => (pending!.kind === 'delete' ? deleteReplay(id) : starReplay(id, false)))] : []),
+    )
+  }
+
+  // Does the action at once, or when it would delete something, first asks with a confirm bar
+  private ask(action: Pending, risky: boolean, act: () => void): void {
+    this.pending = null
+    if (risky) this.pending = action
+    else act()
+    this.refresh()
+  }
+
+  // A question with Confirm and Cancel under it
+  private confirmBar(question: string, onConfirm: () => void): HTMLElement {
+    const close = () => {
+      this.pending = null
+      this.refresh()
+    }
+    return element(
+      'div',
+      'confirm-bar',
+      element('p', 'notice', question),
+      element('div', 'confirm-buttons', button(t().confirm, () => {
+        onConfirm()
+        close()
+      }, 'danger'), button(t().cancel, close)),
     )
   }
 

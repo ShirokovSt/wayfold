@@ -45,7 +45,7 @@ export async function saveReplay(replay: Replay, starred = false): Promise<Saved
   if (!list.includes(saved)) return null // older than all the kept ones
   // When the storage is full, the oldest unstarred replays make room, as long as there are any
   while (!store(replayKey(saved.id), packed)) {
-    const oldest = unstarred(list).filter((other) => other !== saved).at(-1)
+    const oldest = byAge(list).filter((other) => other !== saved).at(-1)
     if (!oldest) {
       list = remove(list, saved)
       break
@@ -74,18 +74,24 @@ export function starReplay(id: string, starred: boolean): void {
   keep(list)
 }
 
+// The replays that would go with this limit, and with this one's star taken off: the player is told before
+export function droppedBy(limit: number, unstarred?: string): string[] {
+  const list = savedReplays().map((saved) => (saved.id === unstarred ? { ...saved, starred: false } : saved))
+  return byAge(list).slice(limit).map((saved) => saved.id)
+}
+
 function keep(list: SavedReplay[]): void {
   writeList(trim(list))
 }
 
 // Drops the unstarred replays beyond the limit, the oldest first
 function trim(list: SavedReplay[]): SavedReplay[] {
-  for (const old of unstarred(list).slice(replayLimit())) list = remove(list, old)
+  for (const old of byAge(list).slice(replayLimit())) list = remove(list, old)
   return list
 }
 
-// Newest first
-function unstarred(list: SavedReplay[]): SavedReplay[] {
+// The unstarred ones, newest first
+function byAge(list: SavedReplay[]): SavedReplay[] {
   return list.filter((saved) => !saved.starred).sort((a, b) => b.info.savedAt - a.info.savedAt)
 }
 
