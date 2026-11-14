@@ -24,6 +24,26 @@ describe('rival AI', () => {
     expect(world.villages.filter((v) => v.owner === RIVAL).length).toBeGreaterThan(1)
   })
 
+  it('spends spare gold on the border instead of hoarding it: a town against towers, and a tower', () => {
+    const world = handmadeWorld(['.........', '........', '.........', '........', '.........'])
+    const home = addVillage(world, 0, 2, RIVAL, 30, true)
+    addVillage(world, 5, 2, HUMAN, 40, true)
+    world.map.cellAtOffset(6, 2)!.owner = HUMAN
+    world.map.cellAtOffset(6, 2)!.building = { kind: 'tower', reload: 0 }
+    for (const cell of world.map.within(home.cell, 1)) cell.owner = RIVAL
+    world.gold[RIVAL] = 1000
+    const play = (difficulty: 'normal' | 'hard') => {
+      const copy = structuredClone(world)
+      Object.setPrototypeOf(copy.map, Object.getPrototypeOf(world.map))
+      const rival = new Rival(RIVAL, createRandom(1), difficulty)
+      for (let t = 0; t < 30; t += TICK_SECONDS) rival.update(copy, TICK_SECONDS)
+      const village = copy.villages[home.id]
+      return { town: village.town, towers: copy.map.cells.filter((cell) => cell.owner === RIVAL && cell.building?.kind === 'tower').length }
+    }
+    expect(play('hard')).toEqual({ town: true, towers: 1 })
+    expect(play('normal')).toEqual({ town: false, towers: 1 }) // the tower at its front, but no town for a lone village
+  })
+
   it('leads a squad left with no village at the nearest one it can take', () => {
     const world = handmadeWorld(['.......', '......', '.......'])
     const home = addVillage(world, 6, 0, RIVAL, 6)

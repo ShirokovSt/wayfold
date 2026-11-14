@@ -25,6 +25,7 @@ interface Profile {
   watch: Watch
   builds: Project[]
   towns(villages: number): number // how many towns it wants: they grow slower, so never all of its villages
+  spends: boolean // with its plans done, spends what is left: more farms, and on the border towers and towns against towers
 }
 
 // Which enemy squads a village keeps a garrison against: none (it sends everyone),
@@ -43,7 +44,12 @@ interface Target {
 const BIG_VILLAGE = 20 // people: worth turning into a town even away from the front
 const WILD_LOSSES = 3 // people a squad may lose to bites on its way to a den
 const TOWER_LOSSES = 1.5 // a squad under a tower's volleys needs about half as many again
+const BORDER = 5 // tiles to the nearest enemy village: a village this close is on the border
+const MAX_FARMS = 5 // a village's farms that a hard rival builds with spare gold; a player may build more
 const HUNT_PARTIES = 2 // villages sending hunters at a homeless squad, so it is caught between them
+
+// Something to build for a village, or the village to upgrade
+type Plan = [Village, BuildingKind | 'town']
 
 // Like the player, the rival sends either half of a village's people or all of them
 interface Sender {
@@ -55,15 +61,15 @@ interface Sender {
 const PROFILES: Record<Difficulty, Profile> = {
   easy: {
     firstMove: 20, think: 6, margin: 6, maxGroup: 1, defendChance: 0.5, hunts: false, watch: 'none', builds: ['farm'],
-    towns: () => 0,
+    towns: () => 0, spends: false,
   },
   normal: {
     firstMove: 10, think: 3.5, margin: 4, maxGroup: 3, defendChance: 1, hunts: false, watch: 'aimed', builds: ['farm', 'town', 'tower'],
-    towns: (villages) => (villages >= 5 ? 3 : villages >= 3 ? 2 : 0),
+    towns: (villages) => (villages >= 5 ? 3 : villages >= 3 ? 2 : 0), spends: false,
   },
   hard: {
     firstMove: 6, think: 2, margin: 4, maxGroup: 4, defendChance: 1, hunts: true, watch: 'nearby', builds: ['farm', 'town', 'tower'],
-    towns: (villages) => (villages >= 3 ? Math.max(2, Math.floor(villages / 2)) : 0),
+    towns: (villages) => (villages >= 3 ? Math.max(2, Math.floor(villages / 2)) : 0), spends: true,
   },
 }
 
@@ -156,7 +162,7 @@ export class Rival {
     const capital = villages.find((v) => v.capital)
     const front = this.frontVillage(world)
     const farms = (village: Village) => estateBuildings(world, village, 'farm').length
-    const plans: [Village, BuildingKind | 'town'][] = []
+    const plans: Plan[] = []
     if (capital && farms(capital) === 0) plans.push([capital, 'farm'])
     if (capital && villages.length >= 3 && !capital.town) plans.push([capital, 'town'])
     if (front && estateBuildings(world, front, 'tower').length === 0) plans.push([front, 'tower'])
@@ -168,6 +174,7 @@ export class Rival {
       upgrade(front)
       for (const village of villages.filter((village) => village.population >= BIG_VILLAGE)) upgrade(village)
     }
+    if (this.profile.spends) plans.push(...this.sparePlans(world, villages, farms))
 
     for (const [village, kind] of plans.filter(([, kind]) => this.profile.builds.includes(kind))) {
       if (kind === 'town') {
@@ -184,6 +191,27 @@ export class Rival {
       if (world.gold[this.player] >= costOf(kind)) build(world, this.player, spot, kind)
       return
     }
+  }
+
+  // What gold left over from the plans goes to, so it is not hoarded. First a third farm in every village, as a farm
+  // pays for itself in people fast; then the border villages, nearest to the enemy first: where the enemy hides behind
+  // towers, they become towns, as only soldiers can take what a tower guards, and each gets a tower of its own;
+  // then more farms, up to MAX_FARMS a village
+  private sparePlans(world: World, villages: Village[], farms: (village: Village) => number): Plan[] {
+    const enemy = this.enemyVillages(world)
+    if (enemy.length === 0) return []
+    const distance = (village: Village) => Math.min(...enemy.map((e) => hexDistance(e.cell.hex, village.cell.hex)))
+    const border = villages.filter((village) => distance(village) <= BORDER).sort((a, b) => distance(a) - distance(b))
+    const walled = enemy.some((village) => isGuarded(world, village.cell, this.player))
+    const plan = (kind: Plan[1]) => (village: Village): Plan => [village, kind]
+    const farmRound = (count: number) => villages.filter((village) => farms(village) === count).map(plan('farm'))
+    const moreFarms = Array.from({ length: MAX_FARMS - 3 }, (_, i) => farmRound(3 + i)).flat()
+    return [
+      ...farmRound(2),
+      ...(walled ? border.filter((village) => !village.town).map(plan('town')) : []),
+      ...border.filter((village) => estateBuildings(world, village, 'tower').length === 0).map(plan('tower')),
+      ...moreFarms,
+    ]
   }
 
   // Towers go toward the enemy, farms close to home
