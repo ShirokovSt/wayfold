@@ -19,6 +19,18 @@ describe('village names', () => {
     }
   })
 
+  it.each([
+    [40, 'Белебей', 'Fairford', 'Fairton'],
+    [41, 'Суворово', 'Marshalford', 'Marshalton'],
+  ] as const)('pairs English variants of root %i with %s', (root, russian, ford, ton) => {
+    const first = root * NAME_ENDINGS
+    expect(en.villageName(first + 1)).toBe(ford)
+    expect(en.villageName(first + 2)).toBe(ton)
+    for (let ending = 0; ending < NAME_ENDINGS; ending++) {
+      expect(ru.villageName(first + ending)).toBe(russian)
+    }
+  })
+
   it('give every village of a map a root of its own, the same for the same seed', () => {
     const settings = { type: 'continent', size: 'large', season: 'summer', beasts: 'none', players: 4 } as const
     const names = createWorld(5, settings).villages.map((village) => village.name)

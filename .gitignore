@@ -6,5 +6,6 @@ dist/
 .idea/
 
 # Local assistant files, not part of the project
+/AGENTS.md
 CLAUDE.md
 .claude/

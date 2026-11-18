@@ -3,7 +3,7 @@ import type { Village } from './world'
 
 // A village's name is a root and an ending, both by number: each language spells them its own way,
 // so the same village is Birchwick in English and Берёзовка in Russian
-export const NAME_ROOTS = 40
+export const NAME_ROOTS = 42
 export const NAME_ENDINGS = 10
 
 // Every village of the map gets a root of its own, and any ending

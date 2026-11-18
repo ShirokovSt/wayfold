@@ -7,6 +7,7 @@ const EN_ROOTS = [
   'Cedar', 'Hazel', 'Thorn', 'Apple', 'Stone', 'Moss', 'Hawk', 'Raven', 'Eagle', 'Fox',
   'Bear', 'Beaver', 'Swan', 'Hill', 'Mead', 'Wade', 'Lake', 'Bridge', 'Corn', 'Honey',
   'Star', 'Silver', 'Gold', 'White', 'Red', 'Black', 'Green', 'Still', 'Wind', 'Flint',
+  'Fair', 'Marshal',
 ]
 const EN_ENDINGS = ['wick', 'ford', 'ton', 'by', 'ham', 'field', 'stead', 'brook', 'dale', 'worth']
 
@@ -52,6 +53,8 @@ const RU_NAMES = [
   ['Тихое', 'Тиховодье', 'Тихий Плёс', 'Тихомирово'],
   ['Ветрово', 'Ветряки', 'Ветрополье'],
   ['Кремнёво', 'Кремница', 'Кремнёвка'],
+  ['Белебей'],
+  ['Суворово'],
 ]
 
 export function englishVillageName(name: number): string {
