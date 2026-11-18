@@ -9,6 +9,7 @@ export const TILE_DEPTH = 0.16 // thickness of a tile, in tile sizes
 // zooming in scales it around the screen center, and panning shifts it
 export class Layout {
   zoom = 1
+  touch = false
   private baseSize = 30
   private baseX = 0 // where hex (0, 0) is at zoom 1
   private baseY = 0
@@ -16,12 +17,17 @@ export class Layout {
   private panY = 0
   private width = 0
   private height = 0
+  private boardWidth = 0
+  private boardHeight = 0
 
   get size(): number {
     return this.baseSize * this.zoom
   }
 
   fit(map: GameMap, width: number, height: number): void {
+    const keepView = this.touch && this.zoom > 1 && this.width > 0 && this.height > 0
+    const center = keepView ? this.fromScreen(this.width / 2, this.height / 2) : null
+    const size = this.size
     const boardWidth = SQRT3 * map.width
     const boardHeight = 1.5 * (map.height - 1) + 2 + TILE_DEPTH
     // Not below a few pixels: the canvas can be tiny while the page is still being laid out
@@ -30,7 +36,14 @@ export class Layout {
     this.baseY = (height - boardHeight * this.baseSize) / 2 + this.baseSize
     this.width = width
     this.height = height
-    this.clampPan()
+    this.boardWidth = boardWidth
+    this.boardHeight = boardHeight
+    if (center) {
+      this.zoom = this.limitedZoom(size / this.baseSize)
+      this.centerOn(center)
+    } else {
+      this.clampPan()
+    }
   }
 
   resetCamera(): void {
@@ -39,10 +52,16 @@ export class Layout {
     this.panY = 0
   }
 
+  frameCapital(hex: Hex): void {
+    if (!this.touch || this.baseSize >= 19) return
+    this.zoom = this.limitedZoom(19 / this.baseSize)
+    this.centerOn(hexToPoint(hex, 1))
+  }
+
   // Zooms so that the point under (x, y) stays where it is, like on online maps
   zoomAt(x: number, y: number, factor: number): void {
     const before = this.fromScreen(x, y)
-    this.zoom = Math.min(MAX_ZOOM, Math.max(1, this.zoom * factor))
+    this.zoom = this.limitedZoom(this.zoom * factor)
     const after = this.toScreen(before.x, before.y)
     this.panX += x - after.x
     this.panY += y - after.y
@@ -82,10 +101,22 @@ export class Layout {
     return this.height / 2 + (this.baseY - this.height / 2) * this.zoom + this.panY
   }
 
+  private centerOn(point: Point): void {
+    const at = this.toScreen(point.x, point.y)
+    this.panBy(this.width / 2 - at.x, this.height / 2 - at.y)
+  }
+
+  private limitedZoom(zoom: number): number {
+    const max = this.touch ? Math.max(MAX_ZOOM, 32 / this.baseSize) : MAX_ZOOM
+    return Math.min(max, Math.max(1, zoom))
+  }
+
   // The zoomed board can be moved only as far as it sticks out beyond the screen
   private clampPan(): void {
-    const maxX = (this.width * (this.zoom - 1)) / 2
-    const maxY = (this.height * (this.zoom - 1)) / 2
+    // A touch camera can center a settlement near the edge whenever it is zoomed in.
+    const free = this.touch && this.zoom > 1
+    const maxX = free ? this.boardWidth * this.size / 2 : this.width * (this.zoom - 1) / 2
+    const maxY = free ? this.boardHeight * this.size / 2 : this.height * (this.zoom - 1) / 2
     this.panX = Math.min(maxX, Math.max(-maxX, this.panX))
     this.panY = Math.min(maxY, Math.max(-maxY, this.panY))
   }

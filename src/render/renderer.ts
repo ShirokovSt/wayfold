@@ -268,19 +268,25 @@ export class Renderer {
       ctx.stroke()
     }
 
-    ctx.setLineDash([size * 0.12, size * 0.16])
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.lineWidth = size * 0.1
-    ctx.strokeStyle = tone.dark
+    ctx.beginPath()
     for (const path of drag.paths) {
-      ctx.beginPath()
-      for (const cell of path) {
+      path.forEach((cell, index) => {
         const { x, y } = tileCenter(this.layout, cell)
-        ctx.lineTo(x, y)
-      }
-      ctx.stroke()
+        if (index === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      })
     }
+    ctx.strokeStyle = tone.dark
+    if (this.layout.touch) {
+      ctx.lineWidth = Math.max(3, size * 0.17)
+      ctx.stroke()
+      ctx.strokeStyle = tone.light
+    }
+    ctx.setLineDash(this.layout.touch ? [4, 4] : [size * 0.12, size * 0.16])
+    ctx.lineWidth = this.layout.touch ? Math.max(1.5, size * 0.08) : size * 0.1
+    ctx.stroke()
     ctx.setLineDash([])
     if (drag.target && drag.paths.length > 0) {
       hexPath(ctx, tileCenter(this.layout, drag.target), size * 0.86)

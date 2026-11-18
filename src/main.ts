@@ -7,17 +7,19 @@ import { Game } from './game'
 import { currentLanguage, onLanguageChange, t } from './i18n'
 import { CameraControls } from './input/camera'
 import { PointerInput } from './input/pointer'
+import { TouchOrders } from './input/touchOrders'
 import { Renderer } from './render/renderer'
 import { type Replay, canWatch, fromBytes } from './replays/format'
 import { type SavedReplay, loadReplay, saveReplay } from './replays/library'
 import { TICK_SECONDS } from './sim/rules'
-import type { Cell } from './sim/world'
+import { HUMAN, type Cell } from './sim/world'
 import { readStored, store } from './storage'
 import { Hud, PLAY_SPEED_LIMIT } from './ui/hud'
 import { ReplayBar } from './ui/replayBar'
 import { downloadReplay } from './ui/replayFiles'
 import { Screens } from './ui/screens'
 import { TileCard } from './ui/tileCard'
+import { TouchOrderPanel } from './ui/touchOrderPanel'
 import { TutorialPanel } from './ui/tutorialPanel'
 import { zoomButtons } from './ui/zoomButtons'
 
@@ -35,13 +37,24 @@ const game = new Game(Date.now())
 const canvas = document.querySelector<HTMLCanvasElement>('#board')!
 const renderer = new Renderer(canvas, game.world)
 const input = new PointerInput(canvas, renderer.layout, game)
+const orders = new TouchOrders(game)
 const screens = new Screens(document.querySelector('#overlay')!)
 const hud = new Hud(document.querySelector('#hud')!, game, { togglePause, openMenu, setSpeed })
 const stage = document.querySelector<HTMLElement>('.stage')!
+const playArea = document.querySelector<HTMLElement>('.play-area')!
+const battlefield = document.querySelector<HTMLElement>('.battlefield')!
 const card = new TileCard(stage, game, renderer.layout)
 const camera = new CameraControls(canvas, renderer.layout)
 const banner = document.querySelector<HTMLElement>('#banner')!
-const tutorial = new TutorialPanel(stage, skipTutorial)
+const tutorial = new TutorialPanel(playArea, skipTutorial)
+const orderPanel = new TouchOrderPanel(stage, orders, (cell) => {
+  orders.clear()
+  orderPanel.update()
+  card.open(cell)
+}, () => {
+  if (!screens.isOpen && orders.confirm()) orderPanel.announce(game.paused)
+  orderPanel.update()
+})
 const replayBar = new ReplayBar(stage, game, { togglePause, seek, exit: stopWatching })
 const events = new EventWatcher()
 let endShown = false
@@ -50,6 +63,9 @@ let pausedBeforeMenu = false
 // Any press closes the card; a click on another tile opens that one's, a click on the same tile leaves it closed
 let closedCell: Cell | null = null
 input.onPress = () => {
+  setTouch(false)
+  orders.clear()
+  orderPanel.update()
   closedCell = card.cell
   card.close()
 }
@@ -57,8 +73,46 @@ input.onTileClick = (cell) => {
   if (cell !== closedCell) card.open(cell)
 }
 input.onCameraMove = () => renderer.cameraMoved()
+input.onTouchStart = () => setTouch(true)
+input.onTouchTap = (cell, squad) => {
+  if (screens.isOpen) return
+  if (orders.draft) {
+    if (cell) orders.tap(cell)
+    orderPanel.update()
+    return
+  }
+  const previous = card.cell
+  card.close()
+  const village = cell?.village
+  if (!game.watching && game.world.winner === null) {
+    if (village?.owner === HUMAN && (village.population >= 1 || !squad)) orders.start(village)
+    else if (squad) orders.start(squad)
+  }
+  if (!orders.draft && cell && cell !== previous) card.open(cell)
+  if (orders.draft || card.cell) tutorial.fold()
+  orderPanel.update()
+}
 camera.onChange = () => renderer.cameraMoved()
-zoomButtons(stage, camera)
+zoomButtons(battlefield, camera)
+
+const coarsePointer = window.matchMedia('(pointer: coarse)')
+setTouch(coarsePointer.matches)
+coarsePointer.addEventListener('change', (event) => setTouch(event.matches))
+
+function setTouch(touch: boolean): void {
+  renderer.layout.touch = touch
+  document.body.classList.toggle('touch-controls', touch)
+  tutorial.setTouch(touch)
+  showTexts()
+}
+
+function clearBoardSelection(): void {
+  input.cancel()
+  orders.clear()
+  orderPanel.update()
+  orderPanel.clearStatus()
+  card.close()
+}
 
 function play(): void {
   game.started = true
@@ -95,9 +149,8 @@ function openMenu(): void {
     pausedBeforeMenu = game.paused
     game.paused = true
     banner.hidden = true
-    input.drag = null
-    input.hover = null
-    card.close()
+    clearBoardSelection()
+    hud.closeDetails()
   }
   if (!inMatch()) music.play('menu')
   screens.menu({
@@ -156,17 +209,21 @@ function skipTutorial(): void {
 
 function startMatch(): void {
   music.play(game.world.map.season)
+  clearBoardSelection()
   renderer.setWorld(game.world)
-  input.drag = null
-  card.close()
   endShown = false
   playSpeed()
   play()
+  if (renderer.layout.touch) {
+    renderer.resize()
+    const capital = game.world.villages.find((village) => village.owner === HUMAN && village.capital)
+    if (capital) renderer.layout.frameCapital(capital.cell.hex)
+  }
 }
 
 // The finished match from the start, at any speed; the board can be moved and zoomed, but not ordered
 function watchReplay(): void {
-  card.close() // its tile is in the world being left
+  clearBoardSelection()
   game.watch()
   renderer.showWorld(game.world)
   music.play(game.world.map.season)
@@ -174,13 +231,13 @@ function watchReplay(): void {
 }
 
 function seek(ticks: number): void {
-  card.close()
+  clearBoardSelection()
   game.watch(ticks)
   renderer.showWorld(game.world)
 }
 
 function stopWatching(): void {
-  card.close()
+  clearBoardSelection()
   playSpeed()
   if (game.opened) {
     game.close()
@@ -221,10 +278,9 @@ async function openFile(file: File): Promise<void> {
 // A saved replay takes the place of the match, if one is on; it has no result card of its own to show
 function watchOpened(replay: Replay): void {
   tutorial.stop()
-  card.close()
+  clearBoardSelection()
   game.open(replay)
   renderer.setWorld(game.world)
-  input.drag = null
   endShown = true
   music.play(game.world.map.season)
   play()
@@ -239,7 +295,9 @@ function showEnd(): void {
   screens.end(game.world, chooseNewMap, openMenu, watchReplay)
 }
 
-const showTexts = () => (banner.textContent = t().pausedHint)
+function showTexts(): void {
+  banner.textContent = renderer.layout.touch ? t().touchPausedHint : t().pausedHint
+}
 showTexts()
 onLanguageChange(showTexts)
 
@@ -251,7 +309,9 @@ window.addEventListener('keydown', (event) => {
     return
   }
   if (event.key === 'Escape') {
-    if (input.drag) input.drag = null
+    if (hud.closeDetails()) return
+    if (input.drag) input.cancel()
+    else if (orders.draft) orders.clear()
     else if (card.cell) card.close()
     else if (game.watching) stopWatching()
     else openMenu()
@@ -292,9 +352,11 @@ function frame(now: number): void {
     sounds.play(event)
   }
   card.update()
+  orders.update()
+  orderPanel.update()
   tutorial.update(game.world, game.paused)
   renderer.draw(running() ? pending / TICK_MS : 1, now / 1000, {
-    drag: input.drag,
+    drag: input.drag ?? orders.draft,
     hover: input.hover,
     selected: card.cell,
     focus: card.village,
@@ -308,6 +370,7 @@ function frame(now: number): void {
   const winner = game.world.winner
   if (winner !== null && !endShown) {
     endShown = true
+    clearBoardSelection()
     const replay = game.replay() // none for the tutorial
     if (replay) void saveReplay(replay)
     if (tutorial.active) {

@@ -16,6 +16,7 @@ type Stat = 'villages' | 'people' | 'land' | 'gold'
 const STATS: Stat[] = ['villages', 'people', 'land', 'gold']
 const RIVAL_STATS = ['villages', 'people', 'land'] as const // a rival's gold is none of your business
 const MENU_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="12" height="2" rx="1"/><rect x="2" y="11" width="12" height="2" rx="1"/></svg>'
+const DETAILS_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="8" width="2" height="6" rx="1"/><rect x="7" y="2" width="2" height="12" rx="1"/><rect x="12" y="5" width="2" height="9" rx="1"/></svg>'
 export const PAUSE_ICON ='<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>'
 export const PLAY_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2.5v11l9-5.5z"/></svg>'
 // A speaker with sound waves, or crossed out when muted
@@ -51,9 +52,10 @@ export class Hud {
   private seasonName = element('b', '')
   private seasonHint = element('p', '')
   private season = withHint(this.seasonButton, this.seasonName, this.seasonHint)
-  private pauseButton = button('', () => this.actions.togglePause(), 'icon-button')
+  private pauseButton = button('', () => this.actions.togglePause(), 'icon-button hud-pause')
   // Quiet at once, music included; the volumes are in the menu's settings
-  private soundButton = button('', () => sounds.toggle(), 'icon-button')
+  private soundButton = button('', () => sounds.toggle(), 'icon-button hud-sound')
+  private detailsButton = button('', () => this.showDetails(this.detailsButton.ariaExpanded !== 'true'), 'icon-button hud-more')
   private speedButtons: HTMLButtonElement[] = []
 
   constructor(
@@ -63,6 +65,20 @@ export class Hud {
   ) {
     this.build()
     onLanguageChange(() => this.build())
+    document.addEventListener('pointerdown', (event) => {
+      if (!this.root.contains(event.target as Node)) this.closeDetails()
+    })
+  }
+
+  closeDetails(): boolean {
+    if (this.detailsButton.ariaExpanded !== 'true') return false
+    this.showDetails(false)
+    return true
+  }
+
+  private showDetails(open: boolean): void {
+    this.root.classList.toggle('details-open', open)
+    this.detailsButton.ariaExpanded = String(open)
   }
 
   update(): void {
@@ -100,16 +116,20 @@ export class Hud {
     menu.innerHTML = MENU_ICON
     menu.title = `${t().menu} (Esc)`
     menu.ariaLabel = t().menu
+    setIcon(this.detailsButton, DETAILS_ICON, t().matchDetails)
+    this.detailsButton.setAttribute('aria-controls', 'match-details')
+    this.showDetails(false)
     this.rows = world.players.map((player) => (player === HUMAN ? this.yourRow() : this.rivalRow(player)))
     this.speedButtons = SPEEDS.map((speed) => button(`×${speed}`, () => this.actions.setSpeed(speed)))
     const speeds = element('div', 'speed', ...this.speedButtons)
     speeds.title = t().speed
+    const details = element('div', 'hud-details',
+      ...this.rows.slice(1).map((row) => row.block),
+      element('div', 'when', this.season, this.clock), speeds, this.soundButton,
+    )
+    details.id = 'match-details'
     this.root.replaceChildren(
-      menu,
-      ...this.rows.map((row) => row.block),
-      element('div', 'when', this.season, this.clock),
-      element('div', 'group', speeds, this.pauseButton, this.soundButton),
-      this.strip,
+      menu, this.rows[0].block, details, this.detailsButton, this.pauseButton, this.strip,
     )
     this.update()
   }
@@ -118,7 +138,7 @@ export class Hud {
   private yourRow(): Row {
     const values = { villages: element('b', ''), people: element('b', ''), land: element('b', ''), gold: element('b', '') }
     const items = STATS.map((stat) =>
-      withHint(element('span', 'stat', icon(stat), values[stat]), element('b', '', t()[stat]), element('p', '', t().statHints[stat])))
+      withHint(element('span', `stat stat-${stat}`, icon(stat), values[stat]), element('b', '', t()[stat]), element('p', '', t().statHints[stat])))
     const block = element('div', 'stats', element('span', 'name', t().you), ...items)
     block.style.borderColor = ownerTone(HUMAN).main
     return { player: HUMAN, block, values, note: element('span', '') }

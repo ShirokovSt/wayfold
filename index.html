@@ -2,15 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Wayfold</title>
     <meta name="description" content="A territory game where every march redraws the map" />
   </head>
   <body>
     <header id="hud"></header>
     <main class="stage">
-      <canvas id="board"></canvas>
-      <p id="banner" hidden></p>
+      <div class="play-area">
+        <div class="battlefield">
+          <canvas id="board"></canvas>
+          <p id="banner" hidden></p>
+        </div>
+      </div>
     </main>
     <div id="overlay" hidden></div>
     <script type="module" src="./src/main.ts"></script>

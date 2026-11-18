@@ -7,7 +7,7 @@ import {
   type Project, build, canBuild, canBuildOn, canClear, canSell, canUpgrade, clearForest, costOf, refundOf, sell, upgradeToTown,
 } from '../sim/economy'
 import { BUILDING_KINDS, type BuildingKind, type Cell, HUMAN, type Village } from '../sim/world'
-import { element } from './dom'
+import { button, element } from './dom'
 import { icon } from './icons'
 import { type TileInfo, describeEstate, describeTile, linkedVillage } from './tileInfo'
 
@@ -27,6 +27,7 @@ export class TileCard {
   private readonly root = element('div', 'tile-card')
   private readonly info = element('div', 'card-info')
   private readonly actions = element('div', 'card-actions')
+  private readonly closeButton = button('×', () => this.close(), 'panel-close tile-close')
   private buttons = new Map<Action, HTMLButtonElement>()
   private shown = '' // the info drawn last: the page is touched only when it changes
 
@@ -36,9 +37,11 @@ export class TileCard {
     private readonly layout: Layout,
   ) {
     this.root.hidden = true
-    this.root.append(this.info, this.actions)
+    this.root.append(this.closeButton, this.info, this.actions)
     stage.append(this.root)
+    this.closeButton.ariaLabel = t().closePanel
     onLanguageChange(() => {
+      this.closeButton.ariaLabel = t().closePanel
       this.shown = ''
       if (this.cell) this.renderButtons()
     })
@@ -137,6 +140,12 @@ export class TileCard {
 
   // Above the tile, or below it if there is no room; hidden while the tile is scrolled out of view
   private place(cell: Cell): void {
+    if (this.layout.touch) {
+      this.root.style.removeProperty('left')
+      this.root.style.removeProperty('top')
+      this.root.hidden = false
+      return
+    }
     const { x, y } = this.layout.hexToScreen(cell.hex)
     const size = this.layout.size
     const width = this.stage.clientWidth

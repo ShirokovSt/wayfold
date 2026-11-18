@@ -7,6 +7,7 @@ import { type Cell, HUMAN, type Squad, type Village } from '../sim/world'
 
 const SQUAD_GRAB_RADIUS = 0.6 // how close to a squad (in hex radii) a press picks it up
 const DRAG_THRESHOLD = 5 // pixels the pointer must move before a press on empty ground becomes panning
+const TOUCH_THRESHOLD = 9
 
 // One gesture: the villages and squads gathered so far, and where they would go
 export interface Drag {
@@ -19,33 +20,42 @@ export interface Drag {
 
 // Press on your village or squad, sweep over more of them, release on the target: they all set off,
 // all of each village's people, or half of them with Ctrl (⌘ on a Mac) held.
-// Dragging empty ground moves the map, two fingers on a touch screen zoom it,
-// and a plain click on a tile or on your village is passed on, to open the card about it
+// A mouse click inspects a tile. Touches pan anywhere, pinch to zoom, or select with a tap.
 export class PointerInput {
   drag: Drag | null = null
   hover: Cell | null = null
   onPress: () => void = () => {}
   onTileClick: (cell: Cell) => void = () => {}
+  onTouchTap: (cell: Cell | null, squad: Squad | null) => void = () => {}
+  onTouchStart: () => void = () => {}
   onCameraMove: () => void = () => {}
   private pressed: Cell | null = null // a tile pressed outside of a drag
   private strayed = false // the drag has left the tile it started on, so coming back is not a click
   private pan: { x: number; y: number; moved: boolean } | null = null
   private touches = new Map<number, Point>()
-  private pinchDistance = 0
+  private touchMoved = false
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly layout: Layout,
     private readonly game: Game,
   ) {
+    // The canvas uses pointer events for taps and pinches. Cancel the browser's own touch gestures here.
+    canvas.addEventListener('touchstart', (event) => {
+      if (event.cancelable) event.preventDefault()
+    }, { passive: false })
     canvas.addEventListener('pointerdown', (event) => this.press(event))
     canvas.addEventListener('pointermove', (event) => this.move(event))
     canvas.addEventListener('pointerup', (event) => this.release(event))
-    canvas.addEventListener('pointercancel', (event) => {
-      this.touches.delete(event.pointerId)
-      this.drag = null
-      this.pan = null
-    })
+    for (const type of ['pointercancel', 'lostpointercapture'] as const) {
+      canvas.addEventListener(type, (event) => {
+        if (event.pointerType === 'touch') {
+          if (this.touches.delete(event.pointerId)) this.touchMoved = true
+        } else {
+          this.clearMouse()
+        }
+      })
+    }
     canvas.addEventListener('pointerleave', () => (this.hover = null))
     // Ctrl can be pressed or let go in the middle of a drag. Not Shift: pressed often, it calls up Windows' sticky keys
     for (const type of ['keydown', 'keyup'] as const) {
@@ -55,14 +65,36 @@ export class PointerInput {
     }
   }
 
+  cancel(): void {
+    this.clearMouse()
+    this.touches.clear()
+    this.touchMoved = false
+    this.hover = null
+  }
+
+  private clearMouse(): void {
+    this.drag = null
+    this.pan = null
+    this.pressed = null
+  }
+
   private press(event: PointerEvent): void {
-    this.onPress()
-    this.canvas.setPointerCapture(event.pointerId)
-    if (event.pointerType === 'touch') this.touches.set(event.pointerId, { x: event.clientX, y: event.clientY })
-    if (this.touches.size === 2) {
-      this.startPinch()
+    if (event.pointerType === 'touch') {
+      if (this.touches.size === 0) {
+        this.clearMouse()
+        this.hover = null
+        this.touchMoved = false
+        this.onTouchStart()
+      } else {
+        this.touchMoved = true
+      }
+      this.canvas.setPointerCapture(event.pointerId)
+      this.touches.set(event.pointerId, { x: event.clientX, y: event.clientY })
       return
     }
+    if (this.touches.size || event.button !== 0) return
+    this.onPress()
+    this.canvas.setPointerCapture(event.pointerId)
     this.drag = { villages: [], squads: [], target: null, paths: [], share: shareOf(event) }
     this.strayed = false
     // Orders work during the pause too: plan calmly, then let it run
@@ -74,13 +106,11 @@ export class PointerInput {
   }
 
   private move(event: PointerEvent): void {
-    if (this.touches.has(event.pointerId)) {
-      this.touches.set(event.pointerId, { x: event.clientX, y: event.clientY })
-      if (this.touches.size === 2) {
-        this.pinch()
-        return
-      }
+    if (event.pointerType === 'touch') {
+      this.moveTouch(event)
+      return
     }
+    if (this.touches.size) return
     if (this.pan) {
       const dx = event.clientX - this.pan.x
       const dy = event.clientY - this.pan.y
@@ -107,13 +137,19 @@ export class PointerInput {
   }
 
   private release(event: PointerEvent): void {
-    this.touches.delete(event.pointerId)
+    if (event.pointerType === 'touch') {
+      const start = this.touches.get(event.pointerId)
+      const tapped = start && this.touches.size === 1 && !this.touchMoved &&
+        Math.hypot(event.clientX - start.x, event.clientY - start.y) <= TOUCH_THRESHOLD
+      this.touches.delete(event.pointerId)
+      if (tapped) this.onTouchTap(this.cellAt(event) ?? null, this.ownSquadAt(event, true))
+      return
+    }
+    if (event.button !== 0 || this.touches.size) return
     const drag = this.drag
     const pressed = this.pressed
     const panned = this.pan?.moved ?? false
-    this.drag = null
-    this.pressed = null
-    this.pan = null
+    this.clearMouse()
     if (!drag) {
       if (!panned && pressed && pressed === this.cellAt(event)) this.onTileClick(pressed)
       return
@@ -134,21 +170,27 @@ export class PointerInput {
     for (const squad of drag.squads) redirectSquad(world, HUMAN, squad, drag.target)
   }
 
-  // A second finger turns any gesture into zooming
-  private startPinch(): void {
-    this.drag = null
-    this.pan = null
-    this.pressed = null
-    const [a, b] = [...this.touches.values()]
-    this.pinchDistance = Math.hypot(a.x - b.x, a.y - b.y)
-  }
-
-  private pinch(): void {
-    const [a, b] = [...this.touches.values()]
-    const distance = Math.hypot(a.x - b.x, a.y - b.y)
-    const rect = this.canvas.getBoundingClientRect()
-    this.layout.zoomAt((a.x + b.x) / 2 - rect.left, (a.y + b.y) / 2 - rect.top, distance / this.pinchDistance)
-    this.pinchDistance = distance
+  private moveTouch(event: PointerEvent): void {
+    const before = this.touches.get(event.pointerId)
+    if (!before) return
+    const after = { x: event.clientX, y: event.clientY }
+    const dx = after.x - before.x
+    const dy = after.y - before.y
+    if (this.touches.size === 2) {
+      const other = [...this.touches.entries()].find(([id]) => id !== event.pointerId)![1]
+      const distance = Math.hypot(before.x - other.x, before.y - other.y)
+      const nextDistance = Math.hypot(after.x - other.x, after.y - other.y)
+      const rect = this.canvas.getBoundingClientRect()
+      if (distance > 1 && nextDistance > 1) {
+        this.layout.zoomAt((before.x + other.x) / 2 - rect.left, (before.y + other.y) / 2 - rect.top, nextDistance / distance)
+      }
+      this.layout.panBy(dx / 2, dy / 2)
+    } else if (this.touches.size === 1) {
+      if (!this.touchMoved && Math.hypot(dx, dy) <= TOUCH_THRESHOLD) return
+      this.touchMoved = true
+      this.layout.panBy(dx, dy)
+    }
+    this.touches.set(event.pointerId, after)
     this.onCameraMove()
   }
 
@@ -186,10 +228,10 @@ export class PointerInput {
   }
 
   // The nearest of your squads within reach of the pointer
-  private ownSquadAt(event: PointerEvent): Squad | null {
+  private ownSquadAt(event: PointerEvent, touch = false): Squad | null {
     const point = this.layout.fromScreen(...this.canvasPoint(event))
     let best: Squad | null = null
-    let bestDistance = SQUAD_GRAB_RADIUS
+    let bestDistance = touch ? Math.min(1, Math.max(SQUAD_GRAB_RADIUS, 12 / this.layout.size)) : SQUAD_GRAB_RADIUS
     for (const squad of this.game.world.squads) {
       const distance = Math.hypot(squad.x - point.x, squad.y - point.y)
       if (squad.owner === HUMAN && distance < bestDistance) {

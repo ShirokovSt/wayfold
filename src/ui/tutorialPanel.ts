@@ -7,12 +7,17 @@ import { button, element } from './dom'
 export class TutorialPanel {
   private step = -1 // -1 while there is no tutorial
   private readonly root = element('div', 'tutorial')
+  private readonly contents = element('div', 'tutorial-contents')
+  private readonly toggle = button('', () => this.setFolded(!this.folded), 'tutorial-toggle')
+  private folded = false
+  private touch = false
 
   constructor(
     stage: HTMLElement,
     private readonly onSkip: () => void,
   ) {
     this.root.hidden = true
+    this.root.append(this.toggle, this.contents)
     stage.append(this.root)
     onLanguageChange(() => this.active && this.render())
   }
@@ -23,6 +28,16 @@ export class TutorialPanel {
 
   start(): void {
     this.show(0)
+  }
+
+  setTouch(touch: boolean): void {
+    if (touch === this.touch) return
+    this.touch = touch
+    if (this.active) this.render()
+  }
+
+  fold(): void {
+    if (this.touch) this.setFolded(true)
   }
 
   stop(): void {
@@ -45,8 +60,15 @@ export class TutorialPanel {
 
   private show(step: number): void {
     this.step = Math.min(step, STEPS.length - 1)
+    this.setFolded(false)
     this.render()
     this.root.hidden = false
+  }
+
+  private setFolded(folded: boolean): void {
+    this.folded = folded
+    this.root.classList.toggle('folded', folded)
+    this.toggle.ariaExpanded = String(!folded)
   }
 
   private render(): void {
@@ -54,9 +76,13 @@ export class TutorialPanel {
     const actions = element('div', 'actions')
     if (!step.done) actions.append(button(t().next, () => this.show(this.step + 1), 'primary'))
     actions.append(button(t().skipTutorial, this.onSkip))
-    this.root.replaceChildren(
-      element('p', 'step', `${t().step} ${this.step + 1} / ${STEPS.length}`),
-      element('p', '', t().tutorialSteps[step.id]),
+    const strings = t()
+    const title = `${strings.step} ${this.step + 1} / ${STEPS.length}`
+    const touchSteps: Partial<Record<typeof step.id, string>> = strings.touchTutorialSteps
+    this.toggle.textContent = title
+    this.contents.replaceChildren(
+      element('p', 'step', title),
+      element('p', '', (this.touch && touchSteps[step.id]) || strings.tutorialSteps[step.id]),
       actions,
     )
   }

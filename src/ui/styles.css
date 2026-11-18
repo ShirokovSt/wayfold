@@ -1,5 +1,6 @@
 :root {
   color-scheme: dark;
+  touch-action: manipulation; /* Keep double taps from zooming the page around the board. */
   --bg: #2c1e14;
   --panel: #3b2a1d;
   --border: #5a4330;
@@ -20,6 +21,8 @@
 body {
   margin: 0;
   height: 100vh;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
@@ -186,11 +189,20 @@ body {
   color: var(--muted);
 }
 
-.group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
+.hud-details {
+  display: contents;
+}
+
+#hud .hud-more {
+  display: none;
+}
+
+.hud-pause {
+  order: 1;
+}
+
+.hud-sound {
+  order: 2;
 }
 
 button {
@@ -226,7 +238,7 @@ button.primary:hover {
 
 .speed {
   display: flex;
-  margin-right: 6px;
+  margin-inline-start: auto;
 }
 
 .speed button {
@@ -262,8 +274,27 @@ button.primary:hover {
 
 .stage {
   position: relative;
-  flex: 1;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
   min-height: 0;
+}
+
+.play-area,
+.battlefield {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.play-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.battlefield {
+  touch-action: none;
 }
 
 #board {
@@ -430,6 +461,27 @@ button.primary:hover {
   font-size: 18px;
   line-height: 1;
   background: rgba(74, 54, 38, 0.9);
+}
+
+.zoom button[aria-pressed='true'] {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.fullscreen-notice {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: min(260px, calc(100vw - 24px));
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 /* Replay: a bar under the board with the timeline */
@@ -896,4 +948,345 @@ button.primary:hover {
 
 .tutorial button.primary {
   padding: 5px 16px;
+}
+
+.tutorial-toggle,
+.tile-close {
+  display: none;
+}
+
+/* A touch order and the tile details have their own space outside the canvas. */
+
+.touch-order,
+.touch-controls .tile-card {
+  position: relative;
+  transform: none;
+  flex: 0 0 auto;
+  max-width: none;
+  max-height: min(44dvh, 250px);
+  overflow: auto;
+  padding: 6px 12px 10px;
+  border-top: 2px solid #c9b791;
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: none;
+  font-size: 14px;
+}
+
+.touch-order[hidden],
+.touch-order [hidden] {
+  display: none;
+}
+
+.order-header,
+.order-share,
+.order-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.order-header {
+  justify-content: space-between;
+}
+
+.order-title {
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.order-share > button {
+  flex: 1 1 0;
+}
+
+.order-target {
+  margin: 6px 0;
+  color: #725b43;
+}
+
+.order-actions {
+  flex-wrap: wrap;
+}
+
+.order-actions .primary {
+  flex: 1 1 auto;
+  padding-inline: 12px;
+}
+
+.touch-order button:not(.primary),
+.panel-close {
+  color: var(--ink);
+  background: #efe3c8;
+  border-color: #c9b791;
+}
+
+.touch-order button[aria-pressed='true'] {
+  background: #e4d3f1;
+  border-color: #9067b3;
+  color: #422764;
+}
+
+.touch-order button {
+  min-height: 44px;
+  padding-inline: 9px;
+}
+
+.touch-order button:disabled {
+  opacity: 0.53;
+  cursor: default;
+}
+
+.panel-close {
+  flex: 0 0 44px;
+  width: 44px;
+  min-height: 44px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.touch-controls .tile-card .tile-close {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  display: block;
+}
+
+.touch-controls .tile-card .card-info {
+  min-height: 44px;
+  padding: 6px 46px 0 0;
+}
+
+.touch-controls .tile-card .card-actions {
+  flex-wrap: wrap;
+}
+
+.order-status {
+  position: absolute;
+  z-index: 5;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: center;
+  pointer-events: none;
+}
+
+.touch-controls .zoom {
+  flex-direction: row;
+  gap: 6px;
+  right: 8px;
+  bottom: 8px;
+}
+
+.touch-controls .zoom button {
+  width: 44px;
+  height: 44px;
+}
+
+.touch-controls .tutorial {
+  position: static;
+  width: 100%;
+  max-height: min(34dvh, 180px);
+  overflow: auto;
+  padding: 0 10px 6px;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 14px;
+}
+
+.touch-controls .tutorial.folded {
+  padding-bottom: 0;
+}
+
+.touch-controls .tutorial .tutorial-toggle {
+  display: block;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: #725b43;
+  text-align: left;
+}
+
+.tutorial-toggle::after {
+  content: ' ▴';
+}
+
+.tutorial.folded .tutorial-toggle::after {
+  content: ' ▾';
+}
+
+.touch-controls .tutorial.folded .tutorial-contents,
+.touch-controls .tutorial .step {
+  display: none;
+}
+
+.touch-controls .tutorial .actions {
+  margin-top: 6px;
+}
+
+.touch-controls .tutorial .actions button {
+  min-height: 44px;
+}
+
+@media (orientation: landscape) and (min-width: 640px), (min-width: 720px) and (min-height: 650px) {
+  .touch-controls .stage {
+    flex-direction: row;
+  }
+
+  .touch-controls .touch-order,
+  .touch-controls .tile-card {
+    flex-basis: clamp(215px, 29vw, 310px);
+    max-height: none;
+    border-top: 0;
+    border-left: 2px solid #c9b791;
+  }
+
+  .touch-controls .order-actions .primary {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 900px), (pointer: coarse) and (max-width: 1100px) {
+  #hud {
+    flex-wrap: nowrap;
+    min-height: 58px;
+    gap: 5px;
+    padding: 4px 8px 8px;
+  }
+
+  #hud > .stats {
+    gap: 4px;
+    margin-inline-end: auto;
+    padding-inline: 4px;
+  }
+
+  #hud > .stats .name,
+  #hud > .stats .hinted:has(.stat-land) {
+    display: none;
+  }
+
+  #hud .icon-button,
+  .replay .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  #hud .hud-more {
+    display: inline-grid;
+  }
+
+  .hud-pause {
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  .hud-pause:hover {
+    background: #e7d7b7;
+  }
+
+  .hud-details {
+    position: absolute;
+    z-index: 12;
+    top: 100%;
+    right: 6px;
+    display: none;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: min(410px, calc(100% - 12px));
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 0 0 10px 10px;
+    background: var(--panel);
+  }
+
+  .details-open .hud-details {
+    display: flex;
+  }
+
+  .hud-details .speed {
+    margin: 0;
+  }
+
+  .hud-details .speed button,
+  .hud-details .season-button,
+  .replay button {
+    min-height: 44px;
+  }
+
+  #banner {
+    top: 6px;
+    width: max-content;
+    max-width: calc(100% - 12px);
+    padding: 4px 10px;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  #overlay {
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+
+  .card,
+  .card.menu,
+  .card.small {
+    width: min(100%, 560px);
+    min-width: 0;
+    max-height: 100%;
+    margin: 0;
+    padding: 16px;
+  }
+
+  .card.menu {
+    width: min(100%, 360px);
+  }
+
+  .card .choices,
+  .card.settings .choices {
+    width: 100%;
+  }
+
+  .card button:not(.help, .star) {
+    min-height: 44px;
+  }
+
+  .replay {
+    flex-wrap: wrap;
+    gap: 3px 8px;
+    padding: 4px 8px;
+  }
+
+  .replay .timeline {
+    flex-basis: 100%;
+    order: 1;
+    margin-top: 0;
+  }
+
+  .replay-time {
+    margin-inline-end: auto;
+  }
+}
+
+@media (max-width: 380px) {
+  #hud > .stats .hinted:has(.stat-people) {
+    display: none;
+  }
+
+  .choices {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .choice .options {
+    margin-bottom: 6px;
+  }
 }
