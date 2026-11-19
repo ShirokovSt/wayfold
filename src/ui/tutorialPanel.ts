@@ -45,6 +45,10 @@ export class TutorialPanel {
     this.root.hidden = true
   }
 
+  showOnBoard(visible: boolean): void {
+    this.root.hidden = !visible || !this.active
+  }
+
   // Runs every frame
   update(world: World, paused: boolean): void {
     if (this.active && STEPS[this.step].done?.(world, paused)) this.show(this.step + 1)

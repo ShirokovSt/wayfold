@@ -4,7 +4,7 @@ import { sounds } from '../audio/sounds'
 import { currentLanguage, onLanguageChange, t } from '../i18n'
 import { DIFFICULTIES } from '../ai/rival'
 import type { MatchSettings } from '../game'
-import { REPLAY_EXTENSION, canWatch } from '../replays/format'
+import { REPLAY_EXTENSION, type Replay, canWatch } from '../replays/format'
 import {
   REPLAY_LIMITS, type SavedReplay, deleteReplay, droppedBy, replayLimit, savedReplays, setReplayLimit, starReplay,
 } from '../replays/library'
@@ -15,6 +15,7 @@ import { ownerTone } from '../render/palette'
 import { button, element } from './dom'
 import { formatTime } from './hud'
 import { languageSelect } from './languageSelect'
+import { downloadReplay } from './replayFiles'
 
 // The settings as the new map card shows and changes them
 export interface MatchChoice {
@@ -108,7 +109,7 @@ export class Screens {
     )
   }
 
-  end(world: World, onNewMap: () => void, onMenu: () => void, onWatch: () => void): void {
+  end(world: World, onNewMap: () => void, onMenu: () => void, onWatch: () => void, replaySave?: Promise<Replay | null>): void {
     const won = world.winner === HUMAN
     this.show(null, () =>
       element(
@@ -118,6 +119,7 @@ export class Screens {
         element('p', '', won ? t().victoryText : t().defeatText),
         places(world),
         element('p', 'muted', `${t().matchTime}: ${formatTime(world.time)}`),
+        this.replaySaveNotice(replaySave),
         element(
           'div',
           'actions centered',
@@ -129,16 +131,28 @@ export class Screens {
     )
   }
 
+  private replaySaveNotice(replaySave?: Promise<Replay | null>): HTMLElement {
+    const notice = element('div', '')
+    notice.setAttribute('aria-live', 'polite')
+    void replaySave?.then((replay) => {
+      if (!replay || !notice.isConnected) return
+      notice.className = 'confirm-bar'
+      notice.append(element('p', 'notice', t().replayNotSaved), button(t().download, () => void downloadReplay(replay)))
+    })
+    return notice
+  }
+
   // The kept replays, newest first, and how many of them to keep; a file can be opened too.
   // The notice tells what went wrong, e.g. with an opened file
-  replays(actions: ReplayActions, notice: string | null = null): void {
+  replays(actions: ReplayActions, notice?: () => string): void {
     this.pending = null
     this.show(actions.back, () => {
       const list = savedReplays()
+      const currentLimit = replayLimit()
       const pending = this.pending
       // A lower limit that would delete replays asks first
       const limit = choiceRow(t().keepReplays, REPLAY_LIMITS.map((count) =>
-        [String(count), replayLimit() === count, () => this.ask({ kind: 'limit', limit: count }, droppedBy(count).length > 0,
+        [String(count), currentLimit === count, () => this.ask({ kind: 'limit', limit: count }, droppedBy(count).length > 0,
           () => setReplayLimit(count))]))
       const dropping = pending?.kind === 'limit' ? droppedBy(pending.limit) : []
       const limitQuestion = pending?.kind === 'limit'
@@ -156,9 +170,10 @@ export class Screens {
         element('div', 'choices', limit),
         ...limitQuestion,
         list.length > 0
-          ? element('div', 'replay-list', ...list.map((saved) => this.replayRow(saved, actions, dropping.includes(saved.id))))
+          ? element('div', 'replay-list', ...list.map((saved) => this.replayRow(saved, actions, dropping.includes(saved.id),
+            saved.starred && droppedBy(currentLimit, saved.id, list).includes(saved.id), currentLimit)))
           : element('p', 'muted', t().noReplays),
-        ...(notice ? [element('p', 'notice', notice)] : []),
+        ...(notice ? [element('p', 'notice', notice())] : []),
         element('div', 'actions', button(t().openFile, () => file.click()), button(t().back, actions.back)),
         file,
       )
@@ -167,10 +182,9 @@ export class Screens {
 
   // The result and the map, when and how long; a star keeps it for good. Deleting asks first,
   // and so does taking off a star when that leaves the replay beyond the limit
-  private replayRow(saved: SavedReplay, actions: ReplayActions, dropping: boolean): HTMLElement {
+  private replayRow(saved: SavedReplay, actions: ReplayActions, dropping: boolean, unstarDrops: boolean, limit: number): HTMLElement {
     const info = saved.info
     const id = saved.id
-    const unstarDrops = saved.starred && droppedBy(replayLimit(), id).includes(id)
     const star = button(saved.starred ? '★' : '☆', () =>
       this.ask({ kind: 'unstar', id }, unstarDrops, () => starReplay(id, !saved.starred)), `star${saved.starred ? ' active' : ''}`)
     star.title = saved.starred ? t().unstarReplay : t().starReplay
@@ -183,7 +197,7 @@ export class Screens {
     const remove = button(t().deleteReplay, () => this.ask({ kind: 'delete', id }, true, () => deleteReplay(id)))
     const pending = this.pending
     const question = pending?.kind === 'delete' && pending.id === id ? t().deleteSure
-      : pending?.kind === 'unstar' && pending.id === id ? t().unstarDrops(replayLimit())
+      : pending?.kind === 'unstar' && pending.id === id ? t().unstarDrops(limit)
       : null
     const notes = [
       ...(canWatch(info) ? [] : [element('p', 'notice', t().otherVersion(info.version))]),

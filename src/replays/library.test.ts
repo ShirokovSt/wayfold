@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { addVillage, handmadeWorld } from '../sim/handmade'
 import { encodeStart } from '../sim/snapshot'
 import { HUMAN, RIVAL } from '../sim/world'
-import { type Replay, newReplay } from './format'
+import { type Replay, newReplay, toBytes } from './format'
 import { deleteReplay, droppedBy, loadReplay, replayLimit, saveReplay, savedReplays, setReplayLimit, starReplay } from './library'
 
 // The browser's storage, kept in memory; `room` is how many characters it holds
-function useStorage(room = Infinity): void {
+function useStorage(room = Infinity) {
   const data = new Map<string, string>()
   const used = () => [...data.values()].reduce((sum, value) => sum + value.length, 0)
   const storage = {
@@ -18,6 +18,7 @@ function useStorage(room = Infinity): void {
     removeItem: (key: string) => data.delete(key),
   }
   Object.assign(globalThis, { localStorage: storage })
+  return { limitToCurrentSize: () => { room = used() } }
 }
 
 function replay(savedAt: number): Replay {
@@ -67,7 +68,7 @@ describe('kept replays', () => {
 
   it('make room for a new one when the storage is full, the oldest unstarred going first', async () => {
     await saveReplay(replay(1))
-    const size = localStorage.getItem(`wayfold.replay.${savedReplays()[0].id}`)!.length
+    const size = localStorage.getItem('wayfold.replays')!.length
     useStorage(size * 3.5) // a few replays and their list
     for (let time = 1; time <= 5; time++) await saveReplay(replay(time))
     const kept = times()
@@ -81,5 +82,33 @@ describe('kept replays', () => {
     await saveReplay(replay(1), true)
     expect(savedReplays()).toHaveLength(1)
     expect(savedReplays()[0].starred).toBe(true)
+  })
+
+  it('keep the existing library when any attempt to save a large replay exceeds storage quota', async () => {
+    const storage = useStorage()
+    const old = await saveReplay(replay(1))
+    setReplayLimit(1)
+    storage.limitToCurrentSize()
+    const large = replay(2)
+    large.orders = Array.from({ length: 1000 }, (_, at) => ({ ...large.orders[0], at }))
+
+    await expect(saveReplay(large)).resolves.toBeNull()
+    expect(savedReplays()).toEqual([old])
+    expect(await loadReplay(old!.id)).toEqual(replay(1))
+  })
+
+  it('keep replays and the limit from the previous storage format', async () => {
+    const old = replay(1)
+    const id = `1-${old.info.end}`
+    localStorage.setItem('wayfold.replayLimit', '1')
+    localStorage.setItem('wayfold.replays', JSON.stringify([{ id, starred: true, info: old.info }]))
+    localStorage.setItem(`wayfold.replay.${id}`, btoa(String.fromCharCode(...await toBytes(old))))
+    expect(replayLimit()).toBe(1)
+    expect(await loadReplay(id)).toEqual(old)
+
+    await saveReplay(replay(2))
+    await saveReplay(replay(3))
+    expect(times()).toEqual([3, 1])
+    expect(await loadReplay(id)).toEqual(old)
   })
 })

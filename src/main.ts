@@ -8,6 +8,7 @@ import { currentLanguage, onLanguageChange, t } from './i18n'
 import { CameraControls } from './input/camera'
 import { PointerInput } from './input/pointer'
 import { TouchOrders } from './input/touchOrders'
+import type { CameraView } from './render/layout'
 import { Renderer } from './render/renderer'
 import { type Replay, canWatch, fromBytes } from './replays/format'
 import { type SavedReplay, loadReplay, saveReplay } from './replays/library'
@@ -59,6 +60,9 @@ const replayBar = new ReplayBar(stage, game, { togglePause, seek, exit: stopWatc
 const events = new EventWatcher()
 let endShown = false
 let pausedBeforeMenu = false
+let replayRequest = 0
+let replaySave: Promise<Replay | null> | undefined
+let replayView: { camera: CameraView; speed: number; pausedBeforeMenu: boolean; saveFailed: boolean } | null = null
 
 // Any press closes the card; a click on another tile opens that one's, a click on the same tile leaves it closed
 let closedCell: Cell | null = null
@@ -89,7 +93,7 @@ input.onTouchTap = (cell, squad) => {
     else if (squad) orders.start(squad)
   }
   if (!orders.draft && cell && cell !== previous) card.open(cell)
-  if (orders.draft || card.cell) tutorial.fold()
+  if (!game.watching && (orders.draft || card.cell)) tutorial.fold()
   orderPanel.update()
 }
 camera.onChange = () => renderer.cameraMoved()
@@ -115,7 +119,7 @@ function clearBoardSelection(): void {
 }
 
 function play(): void {
-  game.started = true
+  if (!game.watching) game.started = true
   game.paused = false
   banner.hidden = true
   screens.hide()
@@ -145,6 +149,7 @@ function setSpeed(speed: number): void {
 
 // The menu holds the match on a real pause: no orders behind it. Continue goes back to it as it was
 function openMenu(): void {
+  replayRequest++
   if (!screens.isOpen) {
     pausedBeforeMenu = game.paused
     game.paused = true
@@ -165,13 +170,13 @@ function openMenu(): void {
 
 // A match being played or watched: the menu over it keeps the season's music
 function inMatch(): boolean {
-  return game.started && (game.watching || game.world.winner === null)
+  return game.watching || (game.started && game.world.winner === null)
 }
 
 function continueMatch(): void {
   screens.hide()
   game.paused = pausedBeforeMenu
-  banner.hidden = !pausedBeforeMenu
+  banner.hidden = game.watching || !pausedBeforeMenu
 }
 
 // The settings change only when Play is pressed; Back leaves them as they were
@@ -212,6 +217,8 @@ function startMatch(): void {
   clearBoardSelection()
   renderer.setWorld(game.world)
   endShown = false
+  replaySave = undefined
+  replayView = null
   playSpeed()
   play()
   if (renderer.layout.touch) {
@@ -238,50 +245,75 @@ function seek(ticks: number): void {
 
 function stopWatching(): void {
   clearBoardSelection()
-  playSpeed()
-  if (game.opened) {
+  if (replayView) {
+    const { camera, speed, pausedBeforeMenu: wasPaused, saveFailed } = replayView
+    replayView = null
     game.close()
-    openReplays()
+    game.speed = speed
+    pausedBeforeMenu = wasPaused
+    tutorial.showOnBoard(true)
+    replayBar.update()
+    renderer.showWorld(game.world)
+    renderer.resize()
+    renderer.layout.restoreCamera(camera)
+    if (inMatch()) music.play(game.world.map.season)
+    openReplays(saveFailed ? () => t().replayNotSaved : undefined)
     return
   }
+  playSpeed()
   game.stopWatching()
   renderer.showWorld(game.world)
   showEnd()
 }
 
 // The kept replays; Back goes to the menu, over the match if one is on
-function openReplays(notice: string | null = null): void {
+function openReplays(notice?: () => string): void {
+  replayRequest++
   if (!inMatch()) music.play('menu')
   screens.replays({ watch: watchSaved, download: downloadSaved, open: openFile, back: openMenu }, notice)
 }
 
-function watchSaved(saved: SavedReplay): void {
-  loadReplay(saved.id).then(watchOpened, () => openReplays(t().badFile))
+async function watchSaved(saved: SavedReplay): Promise<void> {
+  const request = ++replayRequest
+  try {
+    const replay = await loadReplay(saved.id)
+    if (request === replayRequest) watchOpened(replay)
+  } catch {
+    if (request === replayRequest) openReplays(() => t().badFile)
+  }
 }
 
-function downloadSaved(saved: SavedReplay): void {
-  loadReplay(saved.id).then(downloadReplay, () => openReplays(t().badFile))
+async function downloadSaved(saved: SavedReplay): Promise<void> {
+  const request = replayRequest
+  try {
+    await downloadReplay(await loadReplay(saved.id))
+  } catch {
+    if (request === replayRequest) openReplays(() => t().badFile)
+  }
 }
 
 // An opened file is kept with a star, and watched at once if this version of the game can play it
 async function openFile(file: File): Promise<void> {
+  const request = ++replayRequest
   try {
     const replay = await fromBytes(new Uint8Array(await file.arrayBuffer()))
-    await saveReplay(replay, true)
-    if (canWatch(replay.info)) watchOpened(replay)
-    else openReplays()
+    if (request !== replayRequest) return
+    const saved = await saveReplay(replay, true).catch(() => null)
+    if (request !== replayRequest) return
+    if (canWatch(replay.info)) watchOpened(replay, !saved)
+    else openReplays(saved ? undefined : () => t().replayNotSaved)
   } catch {
-    openReplays(t().badFile)
+    if (request === replayRequest) openReplays(() => t().badFile)
   }
 }
 
-// A saved replay takes the place of the match, if one is on; it has no result card of its own to show
-function watchOpened(replay: Replay): void {
-  tutorial.stop()
-  clearBoardSelection()
+function watchOpened(replay: Replay, saveFailed = false): void {
   game.open(replay)
+  replayView ??= { camera: renderer.layout.cameraView(), speed: game.speed, pausedBeforeMenu, saveFailed }
+  replayView.saveFailed = saveFailed
+  tutorial.showOnBoard(false)
+  clearBoardSelection()
   renderer.setWorld(game.world)
-  endShown = true
   music.play(game.world.map.season)
   play()
 }
@@ -292,7 +324,7 @@ function playSpeed(): void {
 }
 
 function showEnd(): void {
-  screens.end(game.world, chooseNewMap, openMenu, watchReplay)
+  screens.end(game.world, chooseNewMap, openMenu, watchReplay, replaySave)
 }
 
 function showTexts(): void {
@@ -354,25 +386,25 @@ function frame(now: number): void {
   card.update()
   orders.update()
   orderPanel.update()
-  tutorial.update(game.world, game.paused)
+  if (!game.watching) tutorial.update(game.world, game.paused)
   renderer.draw(running() ? pending / TICK_MS : 1, now / 1000, {
     drag: input.drag ?? orders.draft,
     hover: input.hover,
     selected: card.cell,
     focus: card.village,
     showRoutes: game.paused,
-    marked: tutorial.marked(game.world),
+    marked: game.watching ? [] : tutorial.marked(game.world),
     stride,
   })
   hud.update()
   replayBar.update()
 
   const winner = game.world.winner
-  if (winner !== null && !endShown) {
+  if (!game.watching && winner !== null && !endShown) {
     endShown = true
     clearBoardSelection()
     const replay = game.replay() // none for the tutorial
-    if (replay) void saveReplay(replay)
+    if (replay) replaySave = saveReplay(replay).then((saved) => saved ? null : replay, () => replay)
     if (tutorial.active) {
       tutorial.stop()
       screens.tutorialDone(chooseNewMap, openMenu)

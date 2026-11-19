@@ -5,6 +5,11 @@ const MARGIN = 24
 const MAX_ZOOM = 3
 export const TILE_DEPTH = 0.16 // thickness of a tile, in tile sizes
 
+export interface CameraView {
+  zoom: number
+  center: Point
+}
+
 // Where the board sits on screen and how big a tile is. At zoom 1 the whole map fits the screen;
 // zooming in scales it around the screen center, and panning shifts it
 export class Layout {
@@ -50,6 +55,15 @@ export class Layout {
     this.zoom = 1
     this.panX = 0
     this.panY = 0
+  }
+
+  cameraView(): CameraView {
+    return { zoom: this.zoom, center: this.fromScreen(this.width / 2, this.height / 2) }
+  }
+
+  restoreCamera(view: CameraView): void {
+    this.zoom = this.limitedZoom(view.zoom)
+    this.centerOn(view.center)
   }
 
   frameCapital(hex: Hex): void {

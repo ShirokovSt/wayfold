@@ -28,7 +28,12 @@ export class Game {
   started = false // false until a match is started from the menu
   speed = 1 // how many game seconds pass in a real second
   watching = false // the finished match is played again: no orders, the moves come from the recording
-  opened: Replay | null = null // a saved replay being watched, with no match of its own behind it
+  private savedPlayback: {
+    replay: Replay
+    recording: Recording
+    previousWorld: World
+    wasWatching: boolean
+  } | null = null
   private rivals: Rival[] = [] // none in the tutorial: the rival there only waits
   private recording!: Recording
   private live!: World
@@ -49,20 +54,31 @@ export class Game {
     this.begin(tutorialWorld())
   }
 
-  // A saved replay, watched from the start
-  open(replay: Replay): void {
-    const start = decodeStart(replay.start)
-    this.begin(start)
-    this.recording = new Recording(start, replay.orders, () => replay.info.ticks)
-    this.opened = replay
-    this.started = true
-    this.watch()
+  get opened(): Replay | null {
+    return this.savedPlayback?.replay ?? null
   }
 
-  // Leaves a saved replay; the board keeps its last moment, behind the menu
+  // A saved replay has its own recording; the current match stays where it was.
+  open(replay: Replay): void {
+    const start = decodeStart(replay.start)
+    const recording = new Recording(start, replay.orders, () => replay.info.ticks)
+    this.savedPlayback = {
+      replay,
+      recording,
+      previousWorld: this.savedPlayback?.previousWorld ?? this.world,
+      wasWatching: this.savedPlayback?.wasWatching ?? this.watching,
+    }
+    this.world = start
+    this.watching = true
+  }
+
+  // The library is still open when the player returns to the previous board.
   close(): void {
-    this.watching = false
-    this.started = false
+    const playback = this.savedPlayback
+    if (!playback) return
+    this.savedPlayback = null
+    this.world = playback.previousWorld
+    this.watching = playback.wasWatching
     this.paused = true
   }
 
@@ -72,7 +88,7 @@ export class Game {
     this.recording = Recording.of(world)
     this.started = false
     this.watching = false
-    this.opened = null
+    this.savedPlayback = null
     this.match = null
     this.rivals = []
   }
@@ -90,13 +106,17 @@ export class Game {
   }
 
   get replayLength(): number {
-    return this.recording.length
+    return this.activeRecording.length
+  }
+
+  private get activeRecording(): Recording {
+    return this.savedPlayback?.recording ?? this.recording
   }
 
   // Watching starts from the beginning; jumping to a moment rebuilds the world as it was then
   watch(ticks = 0): void {
     this.watching = true
-    this.world = this.recording.at(ticks)
+    this.world = this.activeRecording.at(ticks)
   }
 
   stopWatching(): void {
@@ -112,7 +132,7 @@ export class Game {
   update(dt: number): void {
     if (this.paused || this.world.winner !== null) return
     if (this.watching) {
-      this.recording.step(this.world)
+      this.activeRecording.step(this.world)
       return
     }
     for (const rival of this.rivals) rival.update(this.world, dt)
