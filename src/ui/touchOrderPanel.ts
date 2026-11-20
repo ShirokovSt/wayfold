@@ -1,8 +1,8 @@
 import { onLanguageChange, t } from '../i18n'
 import type { TouchOrders } from '../input/touchOrders'
-import { strengthOf } from '../sim/villages'
 import { HUMAN, type Cell } from '../sim/world'
 import { button, element } from './dom'
+import { displayedDefence } from './tileInfo'
 
 export class TouchOrderPanel {
   private readonly root = element('section', 'touch-order')
@@ -79,7 +79,7 @@ export class TouchOrderPanel {
     const destination = draft.target?.village
     const name = destination ? t().villageName(destination.name) : strings.tile
     const defence = destination && destination.owner !== HUMAN
-      ? ` · ${strings.defence(Math.floor(destination.population) * strengthOf(destination))}` : ''
+      ? ` · ${strings.defence(displayedDefence(destination))}` : ''
     setText(this.target, grouping ? strings.chooseGroup : !draft.target ? strings.chooseTarget
       : !reachable ? strings.noRoute : strings.target(name) + defence)
   }

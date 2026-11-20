@@ -19,6 +19,7 @@ export class ReplayBar {
   private readonly exitButton = button('', () => this.actions.exit())
   private readonly label = element('b', '')
   private playing: boolean | null = null
+  private seekFailed = false
 
   constructor(
     stage: HTMLElement,
@@ -36,20 +37,31 @@ export class ReplayBar {
     onLanguageChange(() => this.showTexts())
   }
 
+  showSeekFailure(): void {
+    this.seekFailed = true
+  }
+
+  clearSeekFailure(): void {
+    this.seekFailed = false
+  }
+
   // Runs every frame
   update(): void {
     const game = this.game
     this.root.hidden = !game.watching
     if (!game.watching) return
     const length = game.replayLength
+    const target = game.seekingTo
     this.slider.max = String(length)
-    if (!this.slider.matches(':active')) this.slider.value = String(game.world.ticks) // not under the dragging hand
-    const text = `${formatTime(game.world.time)} / ${formatTime(length * TICK_SECONDS)}`
+    if (!this.slider.matches(':active')) this.slider.value = String(target ?? game.world.ticks)
+    const time = target === null ? game.world.time : target * TICK_SECONDS
+    const position = `${formatTime(time)}${target === null ? '' : '…'}`
+    const text = this.seekFailed ? t().replaySeekFailed : `${position} / ${formatTime(length * TICK_SECONDS)}`
     if (this.time.textContent !== text) this.time.textContent = text
     // A saved replay goes back to the list of replays, the match just played to its result
     const exit = game.opened ? t().toReplays : t().toResults
     if (this.exitButton.textContent !== exit) this.exitButton.textContent = exit
-    const playing = !game.paused && game.world.winner === null
+    const playing = !game.paused && (target !== null || game.world.winner === null)
     if (playing !== this.playing) {
       this.playing = playing
       this.playButton.innerHTML = playing ? PAUSE_ICON : PLAY_ICON

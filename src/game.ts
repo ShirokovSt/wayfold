@@ -3,6 +3,7 @@ import { createRandom } from './core/rng'
 import { DEFAULT_SETTINGS, type MapSettings, createWorld } from './sim/mapgen'
 import { MAX_RIVALS } from './sim/rules'
 import { type Replay, newReplay } from './replays/format'
+import { ReplaySeek } from './replays/seek'
 import { Recording } from './sim/replay'
 import { decodeStart, encodeStart, fingerprint } from './sim/snapshot'
 import { standings, tick } from './sim/tick'
@@ -11,6 +12,7 @@ import { readStored, store } from './storage'
 import { tutorialWorld } from './tutorial/tutorial'
 
 const SETTINGS_KEY = 'wayfold.map'
+const INLINE_SEEK_TICKS = 20 // recalculate at most one second of play on the UI thread
 
 // What the new map card chooses: the map and how strong the rival is
 export interface MatchSettings extends MapSettings {
@@ -36,6 +38,7 @@ export class Game {
   } | null = null
   private rivals: Rival[] = [] // none in the tutorial: the rival there only waits
   private recording!: Recording
+  private replaySeek: ReplaySeek | null = null
   private live!: World
   private match: MatchSettings | null = null // what the match was started with; none for the tutorial
 
@@ -62,6 +65,7 @@ export class Game {
   open(replay: Replay): void {
     const start = decodeStart(replay.start)
     const recording = new Recording(start, replay.orders, () => replay.info.ticks)
+    this.disposeSeek()
     this.savedPlayback = {
       replay,
       recording,
@@ -76,6 +80,7 @@ export class Game {
   close(): void {
     const playback = this.savedPlayback
     if (!playback) return
+    this.disposeSeek()
     this.savedPlayback = null
     this.world = playback.previousWorld
     this.watching = playback.wasWatching
@@ -83,6 +88,7 @@ export class Game {
   }
 
   private begin(world: World): void {
+    this.disposeSeek()
     this.world = world
     this.live = world
     this.recording = Recording.of(world)
@@ -115,13 +121,42 @@ export class Game {
 
   // Watching starts from the beginning; jumping to a moment rebuilds the world as it was then
   watch(ticks = 0): void {
+    this.replaySeek?.cancel()
     this.watching = true
     this.world = this.activeRecording.at(ticks)
   }
 
+  get seekingTo(): number | null {
+    return this.replaySeek?.target ?? null
+  }
+
+  seek(ticks: number, done: (applied: boolean) => void): void {
+    const recording = this.activeRecording
+    const checkpoint = recording.checkpoint(ticks)
+    if (ticks - checkpoint.ticks <= INLINE_SEEK_TICKS) {
+      this.watch(ticks)
+      done(true)
+      return
+    }
+    this.replaySeek ??= new ReplaySeek(recording)
+    this.replaySeek.seek(ticks, checkpoint, (world) => {
+      if (world) {
+        this.world = world
+        recording.note(world)
+      }
+      done(world !== null)
+    })
+  }
+
   stopWatching(): void {
+    this.disposeSeek()
     this.watching = false
     this.world = this.live
+  }
+
+  private disposeSeek(): void {
+    this.replaySeek?.dispose()
+    this.replaySeek = null
   }
 
   changeSettings(settings: MatchSettings): void {
@@ -130,7 +165,7 @@ export class Game {
   }
 
   update(dt: number): void {
-    if (this.paused || this.world.winner !== null) return
+    if (this.paused || this.seekingTo !== null || this.world.winner !== null) return
     if (this.watching) {
       this.activeRecording.step(this.world)
       return

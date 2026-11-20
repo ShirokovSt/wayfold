@@ -24,6 +24,10 @@ export function villageName(village: Village): string {
   return t().villageName(village.name)
 }
 
+export function displayedDefence(village: Village): number {
+  return Math.floor(village.population * strengthOf(village))
+}
+
 // The village a tile is shown with: the one on it, or the one whose estate the tile is in
 export function linkedVillage(world: World, cell: Cell): Village | null {
   return cell.village ?? estateOf(world, cell)
@@ -77,7 +81,7 @@ function describeVillage(world: World, village: Village): TileInfo {
     if (village.town) rows.push([{ text: strings.soldiersHere }])
   }
   if (village.owner !== HUMAN) {
-    rows.push([{ text: strings.defence(Math.floor(village.population * strengthOf(village))) }])
+    rows.push([{ text: strings.defence(displayedDefence(village)) }])
     if (isGuarded(world, village.cell, HUMAN)) rows.push([{ text: strings.guardedHere }])
   }
   const kinds = strings.villageKinds

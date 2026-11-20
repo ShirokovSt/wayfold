@@ -1,4 +1,4 @@
-import { DIRECTIONS, type Hex, addHex, hexDistance } from '../core/hex'
+import { DIRECTIONS, type Hex, addHex } from '../core/hex'
 import type { Cell, Season } from './world'
 
 // A rectangle of hexes; odd rows are one tile shorter and shifted half a tile right,
@@ -46,9 +46,25 @@ export class GameMap {
     return result
   }
 
-  // Cells at most `radius` steps away, including the cell itself
+  // Cells at most `radius` steps away, in the map's row order.
   within(cell: Cell, radius: number): Cell[] {
-    return this.cells.filter((other) => hexDistance(cell.hex, other.hex) <= radius)
+    const { q, r } = cell.hex
+    const firstRow = Math.max(0, Math.ceil(r - radius))
+    const lastRow = Math.min(this.height - 1, Math.floor(r + radius))
+    const result: Cell[] = []
+    for (let row = firstRow; row <= lastRow; row++) {
+      // Axial distance limits both the q offset and the sum of the q and r offsets.
+      const dr = row - r
+      const firstQ = q + Math.max(-radius, -radius - dr)
+      const lastQ = q + Math.min(radius, radius - dr)
+      const shift = Math.floor(row / 2)
+      const firstCol = Math.max(0, Math.ceil(firstQ + shift))
+      const lastCol = Math.min(this.rowLength(row) - 1, Math.floor(lastQ + shift))
+      for (let col = firstCol; col <= lastCol; col++) {
+        result.push(this.cells[this.rowStarts[row] + col])
+      }
+    }
+    return result
   }
 
   // The cell this one lands on after a 180° turn: in row-by-row order that is just the reverse

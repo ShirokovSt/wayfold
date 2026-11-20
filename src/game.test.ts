@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Game } from './game'
-import { fromBytes, toBytes } from './replays/format'
+import { type Replay, fromBytes, toBytes } from './replays/format'
+import golden from './sim/golden-replay.json'
 import { TICK_SECONDS } from './sim/rules'
 import { fingerprint } from './sim/snapshot'
 
@@ -26,6 +27,29 @@ describe('a game', () => {
     game.startTutorial()
     game.world.winner = 0
     expect(game.replay()).toBeNull()
+  })
+
+  it('freezes playback while seeking and applies only the latest target', async () => {
+    const replay = golden as Replay
+    const game = new Game(4)
+    const expected = new Game(4)
+    game.open(replay)
+    expected.open(replay)
+    expected.watch(347)
+    game.paused = false
+
+    let superseded = false
+    game.seek(replay.info.ticks, () => { superseded = true })
+    expect(game.seekingTo).toBe(replay.info.ticks)
+    game.update(TICK_SECONDS)
+    expect(game.world.ticks).toBe(0)
+
+    const applied = await new Promise<boolean>((resolve) => game.seek(347, resolve))
+    expect(applied).toBe(true)
+    expect(game.seekingTo).toBeNull()
+    expect(superseded).toBe(false)
+    expect(game.paused).toBe(false)
+    expect(fingerprint(game.world)).toBe(fingerprint(expected.world))
   })
 
   it('resumes an unfinished match with its original world, rivals and recording after watching a saved replay', () => {

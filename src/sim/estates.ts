@@ -26,7 +26,7 @@ export function estateTiles(world: World, village: Village): Cell[] {
   if (village.owner === null) return []
   return world.map
     .within(village.cell, ESTATE_RADIUS)
-    .filter((cell) => cell !== village.cell && estateVillage(world, cell) === village)
+    .filter((cell) => cell !== village.cell && cell.owner === village.owner && estateVillage(world, cell) === village)
 }
 
 export function estateBuildings(world: World, village: Village, kind: BuildingKind): Cell[] {

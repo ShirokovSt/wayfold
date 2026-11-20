@@ -129,7 +129,7 @@ function play(): void {
 function togglePause(): void {
   if (screens.isOpen) return
   if (game.watching) {
-    const ended = game.world.winner !== null
+    const ended = game.seekingTo === null && game.world.winner !== null
     if (ended) seek(0) // the replay is over: play it from the start again
     game.paused = !ended && !game.paused
     return
@@ -231,6 +231,7 @@ function startMatch(): void {
 // The finished match from the start, at any speed; the board can be moved and zoomed, but not ordered
 function watchReplay(): void {
   clearBoardSelection()
+  replayBar.clearSeekFailure()
   game.watch()
   renderer.showWorld(game.world)
   music.play(game.world.map.season)
@@ -238,9 +239,15 @@ function watchReplay(): void {
 }
 
 function seek(ticks: number): void {
-  clearBoardSelection()
-  game.watch(ticks)
-  renderer.showWorld(game.world)
+  replayBar.clearSeekFailure()
+  game.seek(ticks, (applied) => {
+    if (applied) {
+      clearBoardSelection()
+      renderer.showWorld(game.world)
+    } else {
+      replayBar.showSeekFailure()
+    }
+  })
 }
 
 function stopWatching(): void {
@@ -309,6 +316,7 @@ async function openFile(file: File): Promise<void> {
 
 function watchOpened(replay: Replay, saveFailed = false): void {
   game.open(replay)
+  replayBar.clearSeekFailure()
   replayView ??= { camera: renderer.layout.cameraView(), speed: game.speed, pausedBeforeMenu, saveFailed }
   replayView.saveFailed = saveFailed
   tutorial.showOnBoard(false)
@@ -367,7 +375,7 @@ let stride = 0 // seconds the walkers have walked: their steps stop with the mat
 
 // Paused or over, the world stands still: it is drawn as of the last tick, not between that one and the next
 function running(): boolean {
-  return !game.paused && game.world.winner === null
+  return !game.paused && game.seekingTo === null && game.world.winner === null
 }
 
 function frame(now: number): void {

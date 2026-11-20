@@ -57,10 +57,10 @@ describe('tile cards', () => {
 
   it('tell how strong a village you do not own is', () => {
     const world = handmadeWorld(['.......', '......', '.......'])
-    const town = addVillage(world, 6, 2, RIVAL, 12)
+    const town = addVillage(world, 6, 2, RIVAL, 12.75)
     town.town = true
     const items = describeTile(world, town.cell)!.rows.flat()
-    expect(items.map((item) => item.text)).toContain(en.defence(24))
+    expect(items.map((item) => item.text)).toContain(en.defence(25))
     expect(items.some((item) => item.icon === 'gold')).toBe(false)
   })
 })

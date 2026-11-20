@@ -6,12 +6,15 @@ import { tick } from './tick'
 import type { Order, World } from './world'
 
 const CHECKPOINT_TICKS = 100 // a copy of the world every five seconds of the match
+const SEEK_BATCH_MS = 8
 
 // A match kept for watching again: the world as it started, the players' orders, and copies of the world
 // now and then. Any moment is rebuilt from the copy before it by playing the orders on to it, so the AI is not needed.
 // The copies are made as the match gets that far, played or watched: a replay opened from a file starts with none
 export class Recording {
-  private readonly checkpoints: World[] = []
+  private readonly checkpoints = new Map<number, World>()
+  private readonly ordersByTick = new Map<number, Order[]>()
+  private indexedOrders = 0
 
   constructor(
     start: World,
@@ -32,26 +35,66 @@ export class Recording {
 
   // A copy of how the match started
   get start(): World {
-    return copyWorld(this.checkpoints[0])
+    return copyWorld(this.checkpoints.get(0)!)
   }
 
   // Called after every tick, of the match or of its replay. The copies leave the orders out: the replay reads them
   // from the recording, and each copy would otherwise carry the whole log so far, about half its size
   note(world: World): void {
-    if (world.ticks === this.checkpoints.length * CHECKPOINT_TICKS) this.checkpoints.push(copyWorld({ ...world, orders: [] }))
+    if (world.ticks % CHECKPOINT_TICKS === 0 && !this.checkpoints.has(world.ticks)) {
+      this.checkpoints.set(world.ticks, copyWorld({ ...world, orders: [] }))
+    }
+  }
+
+  // A seek can leave gaps between checkpoints. Most requests still find a copy in the expected slot.
+  checkpoint(ticks: number): World {
+    const exact = this.checkpoints.get(Math.floor(ticks / CHECKPOINT_TICKS) * CHECKPOINT_TICKS)
+    if (exact) return exact
+    let closest: World | undefined
+    for (const world of this.checkpoints.values()) {
+      if (world.ticks <= ticks && (!closest || world.ticks > closest.ticks)) closest = world
+    }
+    return closest!
   }
 
   // The match as it stood after this many ticks
   at(ticks: number): World {
-    const index = Math.min(Math.floor(ticks / CHECKPOINT_TICKS), this.checkpoints.length - 1)
-    const world = copyWorld(this.checkpoints[index])
+    const world = copyWorld(this.checkpoint(ticks))
     while (world.ticks < ticks && world.winner === null) this.step(world)
     return world
   }
 
+  // Yield between batches so a newer seek can replace this one, even during a long recalculation.
+  async atInBatches(
+    ticks: number,
+    signal: AbortSignal,
+    yieldBatch = () => new Promise<void>((resume) => setTimeout(resume, 0)),
+  ): Promise<World | null> {
+    const world = copyWorld(this.checkpoint(ticks))
+    while (world.ticks < ticks && world.winner === null) {
+      const deadline = performance.now() + SEEK_BATCH_MS
+      do {
+        this.step(world)
+      } while (world.ticks < ticks && world.winner === null && performance.now() < deadline)
+      if (world.ticks < ticks && world.winner === null) {
+        await yieldBatch()
+        if (signal.aborted) return null
+      }
+    }
+    return signal.aborted ? null : world
+  }
+
   // One tick of the replay: the orders given at this moment, then the world moves on
   step(world: World): void {
-    for (const order of this.orders) if (order.at === world.ticks) perform(world, order)
+    // Live recordings append orders. Index each one once and keep their order within a tick.
+    while (this.indexedOrders < this.orders.length) {
+      const order = this.orders[this.indexedOrders++]
+      const orders = this.ordersByTick.get(order.at)
+      if (orders) orders.push(order)
+      else this.ordersByTick.set(order.at, [order])
+    }
+    const orders = this.ordersByTick.get(world.ticks)
+    if (orders) for (const order of orders) perform(world, order)
     tick(world, TICK_SECONDS)
     this.note(world)
   }
@@ -59,9 +102,12 @@ export class Recording {
 
 // A deep copy keeps the links between villages, squads and cells; only the map's methods need restoring
 function copyWorld(world: World): World {
-  const copy = structuredClone(world)
-  Object.setPrototypeOf(copy.map, GameMap.prototype)
-  return copy
+  return restoreMap(structuredClone(world))
+}
+
+export function restoreMap(world: World): World {
+  Object.setPrototypeOf(world.map, GameMap.prototype)
+  return world
 }
 
 function perform(world: World, order: Order): void {
