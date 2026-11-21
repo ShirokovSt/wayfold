@@ -18,6 +18,15 @@
   box-sizing: border-box;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 body {
   margin: 0;
   height: 100vh;
@@ -55,7 +64,8 @@ body {
 
 /* A rival: only the numbers, their color tells who it is; greyed out once they have fallen */
 .stats.rival {
-  cursor: default;
+  border-block: 0;
+  border-inline-end: 0;
 }
 
 .hinted.out .stats.rival {
@@ -125,6 +135,14 @@ body {
   cursor: default;
 }
 
+button.stat {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
 .stat-icon {
   display: inline-flex;
   color: var(--muted);
@@ -180,7 +198,7 @@ body {
 }
 
 .hinted:hover .hint,
-.hinted.open .hint {
+.hinted > button[aria-expanded='true'] + .hint {
   display: block;
 }
 
@@ -671,6 +689,16 @@ button.primary:hover {
   margin-bottom: 14px;
 }
 
+.card .replay-library-header {
+  margin: 0 0 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card .replay-library-header h2 {
+  margin: 0;
+}
+
 .replay-list {
   display: flex;
   flex-direction: column;
@@ -824,8 +852,8 @@ button.primary:hover {
 .card .choice .help {
   display: inline-grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   margin-left: 6px;
   padding: 0;
   color: var(--ink);
@@ -837,26 +865,42 @@ button.primary:hover {
   line-height: 1;
 }
 
-.card .choice .help.active {
-  background: var(--ink);
-  color: var(--paper);
-}
-
-.season-rules {
-  grid-column: 1 / -1;
-  padding: 8px 12px;
-  border-radius: 8px;
+.card .choice .help:hover {
   background: #efe3c8;
-  font-size: 13px;
-  line-height: 1.4;
 }
 
-.season-rules p {
+.card.map-help {
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  border: 0;
+}
+
+.card.map-help[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.map-help::backdrop {
+  background: rgba(30, 20, 12, 0.48);
+}
+
+.map-help-text {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  line-height: 1.45;
+}
+
+.map-help-text p {
   margin: 0;
 }
 
-.season-rules p + p {
-  margin-top: 5px;
+.map-help-text p + p {
+  margin-top: 8px;
+}
+
+.map-help .actions {
+  justify-content: flex-end;
 }
 
 .choice .label {
@@ -906,6 +950,100 @@ button.primary:hover {
 .actions.centered {
   justify-content: center;
   gap: 10px;
+}
+
+.map-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.new-map-actions > .primary {
+  margin-inline-start: auto;
+}
+
+.result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 8px;
+}
+
+.card button.result-link {
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.card button.result-link:hover {
+  background: #efe3c8;
+}
+
+.card button.result-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+}
+
+.result-copy .stat-icon {
+  color: inherit;
+}
+
+.result-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.card.map-code-card {
+  width: min(404px, 100%);
+}
+
+.map-code-field {
+  display: grid;
+  gap: 4px;
+  color: #7d6a52;
+}
+
+.map-code-input,
+.map-code-field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid #c9b791;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.map-code-input {
+  font-family: ui-monospace, monospace;
+}
+
+.map-code-input[aria-invalid='true'] {
+  border-color: var(--rival);
+}
+
+.map-code-input[readonly] {
+  width: min(100%, 260px);
+  margin-top: 8px;
+  text-align: center;
+}
+
+.map-code-message {
+  margin: 0;
+}
+
+.map-code-message:not(:empty) {
+  margin-top: 8px;
 }
 
 /* Tutorial: the current step in the lower corner, away from the pause banner at the top */
@@ -1259,6 +1397,11 @@ button.primary:hover {
     min-height: 44px;
   }
 
+  .card .choice .help {
+    width: 36px;
+    height: 36px;
+  }
+
   .replay {
     flex-wrap: wrap;
     gap: 3px 8px;
@@ -1272,7 +1415,7 @@ button.primary:hover {
   }
 
   .replay-time {
-    margin-inline-end: auto;
+    margin-inline-start: auto;
   }
 }
 

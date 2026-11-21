@@ -8,6 +8,7 @@ import { currentLanguage, onLanguageChange, t } from './i18n'
 import { CameraControls } from './input/camera'
 import { PointerInput } from './input/pointer'
 import { TouchOrders } from './input/touchOrders'
+import type { GeneratedMatch } from './mapCode'
 import type { CameraView } from './render/layout'
 import { Renderer } from './render/renderer'
 import { type Replay, canWatch, fromBytes } from './replays/format'
@@ -185,14 +186,25 @@ function chooseNewMap(): void {
   let settings = game.settings
   const choice = { current: () => settings, change: (next: typeof settings) => (settings = next) }
   const start = () => {
+    game.restart(Date.now(), settings)
     game.changeSettings(settings)
-    newMap()
+    playMap()
   }
-  screens.newMap(choice, start, openMenu)
+  const showSettings = () => screens.newMap(choice, start, () => screens.mapFromCode(playFromCode, showSettings), openMenu)
+  showSettings()
 }
 
-function newMap(): void {
-  game.restart(Date.now())
+function playFromCode(match: GeneratedMatch): boolean {
+  try {
+    game.startFromMap(match)
+  } catch {
+    return false
+  }
+  playMap()
+  return true
+}
+
+function playMap(): void {
   tutorial.stop()
   startMatch()
 }
@@ -332,7 +344,9 @@ function playSpeed(): void {
 }
 
 function showEnd(): void {
-  screens.end(game.world, chooseNewMap, openMenu, watchReplay, replaySave)
+  const code = game.mapCode
+  const map = code ? { code, rematch: () => { if (game.rematch()) playMap() } } : undefined
+  screens.end(game.world, chooseNewMap, openMenu, watchReplay, replaySave, map)
 }
 
 function showTexts(): void {

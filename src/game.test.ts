@@ -1,11 +1,47 @@
 import { describe, expect, it } from 'vitest'
 import { Game } from './game'
+import { decodeMapCode } from './mapCode'
 import { type Replay, fromBytes, toBytes } from './replays/format'
 import golden from './sim/golden-replay.json'
 import { TICK_SECONDS } from './sim/rules'
-import { fingerprint } from './sim/snapshot'
+import { encodeStart, fingerprint } from './sim/snapshot'
 
 describe('a game', () => {
+  it('recreates the initial map from a rematch or its code even when type and season were random', () => {
+    const game = new Game(4)
+    game.settings = { size: 'large', type: 'random', season: 'random', rivals: 3, beasts: 'many', difficulty: 'hard' }
+    game.restart(4_294_967_300)
+    const initial = encodeStart(game.world)
+    const code = game.mapCode!
+    const decoded = decodeMapCode(` ${code.toLowerCase()} `)
+    expect(decoded).toMatchObject({ match: { difficulty: 'hard', map: {
+      seed: 4, size: 'large', type: initial.mapType, season: initial.season, rivals: 3, beasts: 'many',
+    } } })
+    if ('error' in decoded) throw new Error('The map code did not decode')
+
+    game.world.villages[0].population = 1
+    game.world.ticks = 200
+    game.world.winner = 0
+    game.settings = { ...game.settings, size: 'small', rivals: 1, difficulty: 'normal' }
+    expect(game.rematch()).toBe(true)
+    expect(game.world.winner).toBeNull()
+    expect(encodeStart(game.world)).toEqual(initial)
+    expect(game.mapCode).toBe(code)
+
+    const imported = new Game(8)
+    imported.startFromMap({ ...decoded.match, difficulty: 'easy' })
+    expect(encodeStart(imported.world)).toEqual(initial)
+    imported.world.winner = 0
+    expect(imported.replay()?.info.difficulty).toBe('easy')
+  })
+
+  it('rejects malformed, incompatible and out-of-range map codes', () => {
+    expect(decodeMapCode('not a code')).toEqual({ error: 'invalid' })
+    expect(decodeMapCode('WF2-4-000010')).toEqual({ error: 'version' })
+    expect(decodeMapCode('WF1-ZZZZZZZ-000010')).toEqual({ error: 'invalid' })
+    expect(decodeMapCode('WF1-4-000030')).toEqual({ error: 'invalid' }) // three rivals on a small map
+  })
+
   it('keeps a finished match as a replay that, opened later, comes to the same end', async () => {
     const game = new Game(4)
     game.settings = { ...game.settings, size: 'small', type: 'continent', rivals: 1, difficulty: 'hard' }
@@ -27,6 +63,8 @@ describe('a game', () => {
     game.startTutorial()
     game.world.winner = 0
     expect(game.replay()).toBeNull()
+    expect(game.mapCode).toBeNull()
+    expect(game.rematch()).toBe(false)
   })
 
   it('freezes playback while seeking and applies only the latest target', async () => {

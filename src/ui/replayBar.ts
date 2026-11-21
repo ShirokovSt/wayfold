@@ -30,7 +30,7 @@ export class ReplayBar {
     this.slider.min = '0'
     this.slider.step = '1'
     this.slider.addEventListener('input', () => this.actions.seek(Number(this.slider.value)))
-    this.root.append(this.label, this.playButton, this.slider, this.time, this.exitButton)
+    this.root.append(this.exitButton, this.label, this.playButton, this.slider, this.time)
     this.root.hidden = true
     stage.after(this.root)
     this.showTexts()

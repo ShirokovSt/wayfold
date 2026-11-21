@@ -54,12 +54,14 @@ export class TutorialPanel {
     if (this.active && STEPS[this.step].done?.(world, paused)) this.show(this.step + 1)
   }
 
-  // The villages and the den the current step talks about, to be ringed on the board
+  // The cells the current step talks about, to be ringed on the board
   marked(world: World): Cell[] {
     if (!this.active) return []
     const step = STEPS[this.step]
-    const villages = step.marked.map((id) => world.villages[id].cell)
-    return step.den ? [...villages, ...world.lairs.map((lair) => lair.cell)] : villages
+    const marked = step.marked.map((id) => world.villages[id].cell)
+    for (const [col, row] of step.tiles ?? []) marked.push(world.map.cellAtOffset(col, row)!)
+    if (step.den) marked.push(...world.lairs.map((lair) => lair.cell))
+    return marked
   }
 
   private show(step: number): void {
@@ -77,10 +79,11 @@ export class TutorialPanel {
 
   private render(): void {
     const step = STEPS[this.step]
-    const actions = element('div', 'actions')
-    if (!step.done) actions.append(button(t().next, () => this.show(this.step + 1), 'primary'))
-    actions.append(button(t().skipTutorial, this.onSkip))
     const strings = t()
+    const actions = element('div', 'actions')
+    const next = step.next ?? (!step.done ? 'next' : null)
+    if (next) actions.append(button(strings[next], () => this.show(this.step + 1), 'primary'))
+    actions.append(button(strings.skipTutorial, this.onSkip))
     const title = `${strings.step} ${this.step + 1} / ${STEPS.length}`
     const touchSteps: Partial<Record<typeof step.id, string>> = strings.touchTutorialSteps
     this.toggle.textContent = title

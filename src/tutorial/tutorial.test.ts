@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { Rival } from '../ai/rival'
 import { createRandom } from '../core/rng'
-import { upgradeToTown } from '../sim/economy'
-import { findPath } from '../sim/pathfind'
-import { TICK_SECONDS } from '../sim/rules'
-import { sendSquad, squadSize } from '../sim/squads'
+import { build, clearForest, upgradeToTown } from '../sim/economy'
+import { findPath, pathDuration } from '../sim/pathfind'
+import { BUILDING_COST, CLEAR_COST, TICK_SECONDS } from '../sim/rules'
+import { redirectSquad, sendSquad, squadSize } from '../sim/squads'
 import { tick } from '../sim/tick'
 import { isGuarded } from '../sim/towers'
 import { HUMAN, type World } from '../sim/world'
-import { STEPS, tutorialWorld } from './tutorial'
+import { STEPS, tutorialWorld, type StepId } from './tutorial'
 
 function play(world: World, seconds: number, rival?: Rival): void {
   for (let t = 0; t < seconds && world.winner === null; t += TICK_SECONDS) {
@@ -17,7 +17,12 @@ function play(world: World, seconds: number, rival?: Rival): void {
   }
 }
 
-const step = (id: string) => STEPS.find((s) => s.id === id)!
+const step = (id: StepId) => STEPS.find((s) => s.id === id)!
+
+function markedTile(world: World, id: StepId) {
+  const [[column, row]] = step(id).tiles!
+  return world.map.cellAtOffset(column, row)!
+}
 
 describe('tutorial', () => {
   it('every village can be reached from the capital', () => {
@@ -43,6 +48,46 @@ describe('tutorial', () => {
   it('the far village is too big for the capital alone at the start', () => {
     const world = tutorialWorld()
     expect(world.villages[2].population).toBeGreaterThan(world.villages[0].population)
+  })
+
+  it('can skip clearing and complete the farm step on the marked existing field', () => {
+    const world = tutorialWorld()
+    const forest = markedTile(world, 'clear')
+    expect(step('clear').next).toBe('skipClear')
+    expect(step('clear').done!(world, false)).toBe(false)
+    world.gold[HUMAN] = BUILDING_COST.farm
+
+    expect(build(world, HUMAN, markedTile(world, 'farm'), 'farm')).toBe(true)
+    expect(step('farm').done!(world, false)).toBe(true)
+    expect(forest.terrain).toBe('forest')
+  })
+
+  it('can practise clearing and then build the farm on that cell', () => {
+    const world = tutorialWorld()
+    const forest = markedTile(world, 'clear')
+    world.gold[HUMAN] = CLEAR_COST + BUILDING_COST.farm
+
+    expect(clearForest(world, HUMAN, forest)).toBe(true)
+    expect(step('clear').done!(world, false)).toBe(true)
+    expect(build(world, HUMAN, forest, 'farm')).toBe(true)
+    expect(step('farm').done!(world, false)).toBe(true)
+  })
+
+  it('remembers a redirect after the squad has arrived', () => {
+    const world = tutorialWorld()
+    const capital = world.villages[0]
+    const target = markedTile(world, 'redirect')
+    const path = findPath(world.map, capital.cell, target)!
+    expect(target.village ?? target.lair).toBeNull()
+    expect(pathDuration(world.map, path)).toBeGreaterThanOrEqual(4)
+
+    const squad = sendSquad(world, HUMAN, capital, target)!
+    play(world, 2)
+    expect(step('redirect').done!(world, false)).toBe(false)
+    expect(redirectSquad(world, HUMAN, squad, capital.cell)).toBe(true)
+    play(world, 10)
+    expect(world.squads).toHaveLength(0)
+    expect(step('redirect').done!(world, false)).toBe(true)
   })
 
   it('the town step is done once a village of yours is a town', () => {

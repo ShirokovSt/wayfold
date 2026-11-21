@@ -1,20 +1,35 @@
 import { element } from './dom'
 
 // Wraps an item of the top bar so a small card explains it: on hover, or after a click,
-// since touch screens have no hover; a click anywhere else closes it
-export function withHint(trigger: HTMLElement, ...hint: (Node | string)[]): HTMLElement {
-  const box = element('div', 'hinted', trigger, element('div', 'hint', ...hint))
+// since touch screens have no hover. The same button works with the keyboard.
+let nextHintId = 0
+
+export function withHint(trigger: HTMLButtonElement, ...hint: (Node | string)[]): HTMLElement {
+  const description = element('div', 'hint', ...hint)
+  description.id = `hud-hint-${++nextHintId}`
+  trigger.type = 'button'
+  trigger.ariaExpanded = 'false'
+  trigger.setAttribute('aria-controls', description.id)
+  trigger.setAttribute('aria-describedby', description.id)
   trigger.addEventListener('click', () => {
-    const wasOpen = box.classList.contains('open')
+    const wasOpen = trigger.ariaExpanded === 'true'
     closeHints()
-    box.classList.toggle('open', !wasOpen)
+    trigger.ariaExpanded = String(!wasOpen)
   })
-  return box
+  trigger.addEventListener('blur', () => { trigger.ariaExpanded = 'false' })
+  trigger.addEventListener('keydown', (event) => {
+    if (event.code === 'Space') event.stopPropagation() // Space activates the hint, not pause.
+    if (event.key === 'Escape' && trigger.ariaExpanded === 'true') {
+      trigger.ariaExpanded = 'false'
+      event.stopPropagation()
+    }
+  })
+  return element('div', 'hinted', trigger, description)
 }
 
 function closeHints(target?: Node): void {
-  for (const box of document.querySelectorAll('.hinted.open')) {
-    if (!target || !box.contains(target)) box.classList.remove('open')
+  for (const trigger of document.querySelectorAll<HTMLButtonElement>('.hinted > button[aria-expanded="true"]')) {
+    if (!target || !trigger.parentElement?.contains(target)) trigger.ariaExpanded = 'false'
   }
 }
 

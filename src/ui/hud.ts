@@ -9,7 +9,7 @@ import { withHint } from './hint'
 import { icon } from './icons'
 
 const SPEEDS = [0.5, 1, 2, 4, 8]
-export const PLAY_SPEED_LIMIT = 2 // faster speeds are only for watching a replay
+export const PLAY_SPEED_LIMIT = 4 // ×8 is only for watching a replay
 const SEASON_ICONS: Record<Season, string> = { summer: '☀', autumn: '🍂', winter: '❄', spring: '🌱' }
 
 type Stat = 'villages' | 'people' | 'land' | 'gold'
@@ -48,7 +48,7 @@ export class Hud {
   private stripRows = element('table', '')
   private clock = element('span', 'clock')
   // The season's icon; hovering or clicking it shows the season's rules
-  private seasonButton = button('', () => {}, 'season-button')
+  private seasonButton = element('button', 'season-button')
   private seasonName = element('b', '')
   private seasonHint = element('p', '')
   private season = withHint(this.seasonButton, this.seasonName, this.seasonHint)
@@ -95,8 +95,10 @@ export class Hud {
     }
     this.updateStrip(world)
     const season = world.map.season
+    const seasonName = t().seasons[season]
     setText(this.seasonButton, SEASON_ICONS[season])
-    setText(this.seasonName, t().seasons[season])
+    if (this.seasonButton.ariaLabel !== seasonName) this.seasonButton.ariaLabel = seasonName
+    setText(this.seasonName, seasonName)
     setText(this.seasonHint, t().seasonHints[season])
     setText(this.clock, formatTime(world.time))
     // On pause the button shows what it will do: play
@@ -138,7 +140,8 @@ export class Hud {
   private yourRow(): Row {
     const values = { villages: element('b', ''), people: element('b', ''), land: element('b', ''), gold: element('b', '') }
     const items = STATS.map((stat) =>
-      withHint(element('span', `stat stat-${stat}`, icon(stat), values[stat]), element('b', '', t()[stat]), element('p', '', t().statHints[stat])))
+      withHint(element('button', `stat stat-${stat}`, element('span', 'visually-hidden', t()[stat]), icon(stat), values[stat]),
+        element('b', '', t()[stat]), element('p', '', t().statHints[stat])))
     const block = element('div', 'stats', element('span', 'name', t().you), ...items)
     block.style.borderColor = ownerTone(HUMAN).main
     return { player: HUMAN, block, values, note: element('span', '') }
@@ -147,7 +150,8 @@ export class Hud {
   // A rival is known by their color: the name and what the numbers mean are in the hint
   private rivalRow(player: PlayerId): Row {
     const values = { villages: element('b', ''), people: element('b', ''), land: element('b', '') }
-    const chip = element('span', 'stats rival', ...RIVAL_STATS.map((stat) => element('span', 'stat', icon(stat), values[stat])))
+    const chip = element('button', 'stats rival', element('span', 'visually-hidden', t().players[player]),
+      ...RIVAL_STATS.map((stat) => element('span', 'stat', element('span', 'visually-hidden', t()[stat]), icon(stat), values[stat])))
     chip.style.borderColor = ownerTone(player).main
     const note = element('p', '')
     return { player, block: withHint(chip, element('b', '', t().players[player]), note), values, note }

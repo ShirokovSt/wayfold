@@ -44,14 +44,17 @@ export function tutorialWorld(): World {
 }
 
 export type StepId =
-  | 'intro' | 'capture' | 'land' | 'pause' | 'group' | 'farm' | 'redirect' | 'wolves' | 'enemy' | 'town' | 'tower'
+  | 'intro' | 'capture' | 'land' | 'pause' | 'group' | 'clear' | 'farm' | 'buildings'
+  | 'redirect' | 'wolves' | 'enemy' | 'town' | 'tower'
 
-// A step is done when the player does what it asks; steps without `done` wait for the Next button
+// A step advances on its goal or with Next. An optional exercise can also offer a named shortcut.
 export interface Step {
   id: StepId
   marked: number[] // villages ringed on the board
+  tiles?: [column: number, row: number][] // other tiles ringed on the board
   den?: boolean // the wolves' den is ringed too
   done?: (world: World, paused: boolean) => boolean
+  next?: 'skipClear'
 }
 
 export const STEPS: Step[] = [
@@ -60,8 +63,12 @@ export const STEPS: Step[] = [
   { id: 'land', marked: [] },
   { id: 'pause', marked: [], done: (_, paused) => paused },
   { id: 'group', marked: [CAPITAL, NEAR, FAR], done: (world) => world.villages[FAR].owner === HUMAN },
-  { id: 'farm', marked: [], done: (world) => world.map.cells.some((cell) => isOwnFarm(cell)) },
-  { id: 'redirect', marked: [], done: (world) => world.squads.some((s) => s.owner === HUMAN && s.start !== null) },
+  { id: 'clear', marked: [], tiles: [[2, 3]], next: 'skipClear',
+    done: (world) => world.orders.some((order) => order.player === HUMAN && order.kind === 'clear') },
+  { id: 'farm', marked: [], tiles: [[1, 4]], done: (world) => world.map.cells.some((cell) => isOwnFarm(cell)) },
+  { id: 'buildings', marked: [] },
+  { id: 'redirect', marked: [], tiles: [[5, 5]],
+    done: (world) => world.orders.some((order) => order.player === HUMAN && order.kind === 'redirect') },
   { id: 'wolves', marked: [], den: true, done: (world) => world.lairs.length === 0 },
   { id: 'enemy', marked: [ENEMY_VILLAGE], done: (world) => world.villages[ENEMY_VILLAGE].owner === HUMAN },
   { id: 'town', marked: [CAPITAL], done: (world) => world.villages.some((v) => v.owner === HUMAN && v.town) },

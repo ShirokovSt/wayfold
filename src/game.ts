@@ -1,5 +1,6 @@
 import { DIFFICULTIES, type Difficulty, Rival } from './ai/rival'
 import { createRandom } from './core/rng'
+import { encodeMapCode, type GeneratedMatch } from './mapCode'
 import { DEFAULT_SETTINGS, type MapSettings, createWorld } from './sim/mapgen'
 import { MAX_RIVALS } from './sim/rules'
 import { type Replay, newReplay } from './replays/format'
@@ -40,17 +41,33 @@ export class Game {
   private recording!: Recording
   private replaySeek: ReplaySeek | null = null
   private live!: World
-  private match: MatchSettings | null = null // what the match was started with; none for the tutorial
+  private match: GeneratedMatch | null = null // what the match was started with; none for the tutorial
 
   constructor(seed: number) {
     this.restart(seed)
   }
 
-  restart(seed: number): void {
-    const settings = this.settings
-    this.begin(createWorld(seed, { ...settings, players: settings.rivals + 1 }))
-    this.match = settings
-    this.rivals = this.world.players.slice(1).map((player, i) => new Rival(player, createRandom(seed + 1 + i * 7), settings.difficulty))
+  restart(seed: number, settings = this.settings): void {
+    seed >>>= 0 // the generator uses 32-bit seeds
+    const { size, beasts, rivals, difficulty } = settings
+    const world = createWorld(seed, { ...settings, players: rivals + 1 })
+    const map = { seed, size, beasts, rivals, type: world.mapType, season: world.map.season }
+    this.begin(world, { map, difficulty })
+  }
+
+  startFromMap({ map, difficulty }: GeneratedMatch): void {
+    const { seed, ...settings } = map
+    this.restart(seed, { ...settings, difficulty })
+  }
+
+  get mapCode(): string | null {
+    return this.match && encodeMapCode(this.match)
+  }
+
+  rematch(): boolean {
+    if (!this.match) return false
+    this.startFromMap(this.match)
+    return true
   }
 
   startTutorial(): void {
@@ -87,7 +104,7 @@ export class Game {
     this.paused = true
   }
 
-  private begin(world: World): void {
+  private begin(world: World, match: GeneratedMatch | null = null): void {
     this.disposeSeek()
     this.world = world
     this.live = world
@@ -95,8 +112,11 @@ export class Game {
     this.started = false
     this.watching = false
     this.savedPlayback = null
-    this.match = null
-    this.rivals = []
+    this.match = match
+    this.rivals = match
+      ? world.players.filter((player) => player !== HUMAN)
+        .map((player, i) => new Rival(player, createRandom(match.map.seed + 1 + i * 7), match.difficulty))
+      : []
   }
 
   // The finished match, to be kept and watched again later; none for the tutorial
@@ -104,8 +124,8 @@ export class Game {
     const live = this.live
     if (!this.match || live.winner === null) return null
     const info = {
-      savedAt: Date.now(), ticks: live.ticks, mapType: live.mapType, size: this.match.size, season: live.map.season,
-      players: live.players.length, difficulty: this.match.difficulty, beasts: this.match.beasts,
+      savedAt: Date.now(), ticks: live.ticks, mapType: live.mapType, size: this.match.map.size, season: live.map.season,
+      players: live.players.length, difficulty: this.match.difficulty, beasts: this.match.map.beasts,
       place: standings(live).indexOf(HUMAN) + 1, end: fingerprint(live),
     }
     return newReplay(info, encodeStart(this.recording.start), [...live.orders])

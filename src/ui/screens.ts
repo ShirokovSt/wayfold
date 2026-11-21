@@ -2,8 +2,9 @@ import { version } from '../../package.json'
 import { music } from '../audio/music'
 import { sounds } from '../audio/sounds'
 import { currentLanguage, onLanguageChange, t } from '../i18n'
-import { DIFFICULTIES } from '../ai/rival'
+import { DIFFICULTIES, type Difficulty } from '../ai/rival'
 import type { MatchSettings } from '../game'
+import { decodeMapCode, type GeneratedMatch } from '../mapCode'
 import { REPLAY_EXTENSION, type Replay, canWatch } from '../replays/format'
 import {
   REPLAY_LIMITS, type SavedReplay, deleteReplay, droppedBy, replayLimit, savedReplays, setReplayLimit, starReplay,
@@ -14,6 +15,7 @@ import { BEASTS, HUMAN, MAP_SIZES, MAP_TYPES, SEASONS, type World } from '../sim
 import { ownerTone } from '../render/palette'
 import { button, element } from './dom'
 import { formatTime } from './hud'
+import { icon } from './icons'
 import { languageSelect } from './languageSelect'
 import { downloadReplay } from './replayFiles'
 
@@ -22,8 +24,6 @@ export interface MatchChoice {
   current(): MatchSettings
   change(settings: MatchSettings): void
 }
-
-type Help = 'season' | 'beasts' | 'rivals'
 
 // Actions that would delete replays, so they are confirmed first
 type Pending = { kind: 'delete' | 'unstar'; id: string } | { kind: 'limit'; limit: number }
@@ -44,10 +44,14 @@ export interface MenuActions {
   tutorialFirst: boolean // offered first until it has been played once
 }
 
+interface MapActions {
+  code: string
+  rematch(): void
+}
+
 // Cards over the board: the menu, the new map card and the end of the match
 export class Screens {
   private content: (() => HTMLElement) | null = null
-  private helpOpen: Help | null = null
   private onEscape: (() => void) | null = null
   private pending: Pending | null = null // an action on the replays that waits for Confirm or Cancel
 
@@ -97,38 +101,107 @@ export class Screens {
     )
   }
 
-  newMap(choice: MatchChoice, onPlay: () => void, onBack: () => void): void {
+  newMap(choice: MatchChoice, onPlay: () => void, onMapCode: () => void, onBack: () => void): void {
     this.show(onBack, () =>
       element(
         'div',
         'card',
         element('h2', '', t().newMap),
         this.choices(choice),
-        element('div', 'actions', button(t().play, onPlay, 'primary'), button(t().back, onBack)),
+        element('div', 'actions map-actions new-map-actions',
+          button(t().back, onBack), button(t().enterMapCode, onMapCode), button(t().play, onPlay, 'primary')),
       ),
     )
   }
 
-  end(world: World, onNewMap: () => void, onMenu: () => void, onWatch: () => void, replaySave?: Promise<Replay | null>): void {
+  mapFromCode(onPlay: (match: GeneratedMatch) => boolean, onBack: () => void): void {
+    let code = ''
+    let chosenDifficulty: Difficulty | undefined
+    let error: 'invalid' | 'version' | 'generation' | undefined
+    this.show(onBack, () => {
+      const strings = t()
+      const input = element('input', 'map-code-input')
+      input.type = 'text'
+      input.autocomplete = 'off'
+      input.autocapitalize = 'characters'
+      input.spellcheck = false
+      input.value = code
+      input.setAttribute('aria-describedby', 'map-code-message')
+      const difficulty = element('select', '', ...DIFFICULTIES.map((level) => {
+        const option = element('option', '', strings.difficulties[level])
+        option.value = level
+        return option
+      }))
+      const summary = element('p', 'muted')
+      const details = element('div', 'map-code-details', summary, element('label', 'map-code-field', strings.difficulty, difficulty))
+      const notice = element('p', 'notice map-code-message')
+      notice.id = 'map-code-message'
+      notice.role = 'status'
+      const start = element('button', 'primary', strings.play)
+      start.type = 'submit'
+      const form = element('form', '',
+        element('label', 'map-code-field', strings.mapCode, input), details, notice,
+        element('div', 'actions map-actions', button(strings.back, onBack), start))
+
+      const update = () => {
+        const parsed = decodeMapCode(code)
+        details.hidden = 'error' in parsed
+        if ('match' in parsed) {
+          const { type, size, season, beasts, rivals } = parsed.match.map
+          summary.textContent = [strings.mapTypes[type], strings.mapSizes[size], strings.seasons[season],
+            strings.rivalCount(rivals), `${strings.beasts.toLowerCase()} — ${strings.beastLevels[beasts].toLowerCase()}`].join(' · ')
+          difficulty.value = chosenDifficulty ?? parsed.match.difficulty
+        }
+        start.disabled = !code.trim()
+        input.ariaInvalid = String(error === 'invalid' || error === 'version')
+        notice.textContent = error === 'invalid' ? strings.invalidMapCode : error === 'version' ? strings.otherMapCodeVersion
+          : error === 'generation' ? strings.mapCodeStartFailed : ''
+      }
+      input.addEventListener('input', () => {
+        code = input.value
+        chosenDifficulty = undefined
+        error = undefined
+        update()
+      })
+      difficulty.addEventListener('change', () => {
+        chosenDifficulty = DIFFICULTIES.find((level) => level === difficulty.value)
+      })
+      form.addEventListener('submit', (event) => {
+        event.preventDefault()
+        const parsed = decodeMapCode(code)
+        if ('error' in parsed) error = parsed.error
+        else if (!onPlay({ ...parsed.match, difficulty: chosenDifficulty ?? parsed.match.difficulty })) error = 'generation'
+        else return
+        update()
+      })
+
+      update()
+      return element('div', 'card map-code-card', element('h2', '', strings.playMapCode), form)
+    })
+  }
+
+  end(
+    world: World, onNewMap: () => void, onMenu: () => void, onWatch: () => void,
+    replaySave?: Promise<Replay | null>, map?: MapActions,
+  ): void {
     const won = world.winner === HUMAN
-    this.show(null, () =>
-      element(
+    this.show(null, () => {
+      const separator = element('span', '', '·')
+      separator.ariaHidden = 'true'
+      return element(
         'div',
         `card small ${won ? 'won' : 'lost'}`,
         element('h2', '', won ? t().victory : t().defeat),
         element('p', '', won ? t().victoryText : t().defeatText),
         places(world),
-        element('p', 'muted', `${t().matchTime}: ${formatTime(world.time)}`),
+        resultMatchDetails(world.time, map?.code),
         this.replaySaveNotice(replaySave),
-        element(
-          'div',
-          'actions centered',
-          button(t().newMap, onNewMap, 'primary'),
-          button(t().watchReplay, onWatch),
-          button(t().toMenu, onMenu),
-        ),
-      ),
-    )
+        element('div', 'actions centered map-actions',
+          ...(map ? [button(t().rematch, map.rematch)] : []), button(t().newMap, onNewMap, 'primary')),
+        element('div', 'result-links muted',
+          button(t().watchReplay, onWatch, 'result-link'), separator, button(t().toMenu, onMenu, 'result-link')),
+      )
+    })
   }
 
   private replaySaveNotice(replaySave?: Promise<Replay | null>): HTMLElement {
@@ -166,7 +239,8 @@ export class Screens {
       return element(
         'div',
         'card replays',
-        element('h2', '', t().replays),
+        element('div', 'actions replay-library-header',
+          element('h2', '', t().replays), button(t().openFile, () => file.click())),
         element('div', 'choices', limit),
         ...limitQuestion,
         list.length > 0
@@ -174,7 +248,7 @@ export class Screens {
             saved.starred && droppedBy(currentLimit, saved.id, list).includes(saved.id), currentLimit)))
           : element('p', 'muted', t().noReplays),
         ...(notice ? [element('p', 'notice', notice())] : []),
-        element('div', 'actions', button(t().openFile, () => file.click()), button(t().back, actions.back)),
+        element('div', 'actions', button(t().back, actions.back)),
         file,
       )
     })
@@ -228,7 +302,7 @@ export class Screens {
     this.refresh()
   }
 
-  // A question with Confirm and Cancel under it
+  // A question with Cancel and Confirm under it
   private confirmBar(question: string, onConfirm: () => void): HTMLElement {
     const close = () => {
       this.pending = null
@@ -238,10 +312,10 @@ export class Screens {
       'div',
       'confirm-bar',
       element('p', 'notice', question),
-      element('div', 'confirm-buttons', button(t().confirm, () => {
+      element('div', 'confirm-buttons', button(t().cancel, close), button(t().confirm, () => {
         onConfirm()
         close()
-      }, 'danger'), button(t().cancel, close)),
+      }, 'danger')),
     )
   }
 
@@ -257,9 +331,9 @@ export class Screens {
     )
   }
 
-  // Esc on a card works like its way back, if it has one
+  // A dialog handles its own Escape before the card can go back.
   escape(): void {
-    this.onEscape?.()
+    if (!this.root.querySelector('dialog[open]')) this.onEscape?.()
   }
 
   hide(): void {
@@ -282,19 +356,37 @@ export class Screens {
       choice.change(next)
       this.refresh()
     }
-    // The rules of seasons and of wolves open under their row from a "?", so the card stays light
-    const help = (topic: Help, title: string) => {
+    const helpTitle = element('h2', '')
+    helpTitle.id = 'map-help-title'
+    const helpText = element('div', 'map-help-text')
+    const closeHelp = button(t().close, () => helpDialog.close(), 'primary')
+    closeHelp.autofocus = true
+    const helpDialog = element('dialog', 'card map-help',
+      helpTitle, helpText, element('div', 'actions', closeHelp),
+    )
+    helpDialog.id = 'map-help'
+    helpDialog.setAttribute('aria-labelledby', helpTitle.id)
+    let helpTrigger: HTMLButtonElement | null = null
+    helpDialog.addEventListener('close', () => helpTrigger?.focus({ preventScroll: true }))
+    const help = (title: string, paragraphs: HTMLElement[]) => {
       const node = button('?', () => {
-        this.helpOpen = this.helpOpen === topic ? null : topic
-        this.refresh()
-      }, `help${this.helpOpen === topic ? ' active' : ''}`)
+        helpTitle.textContent = title
+        helpText.replaceChildren(...paragraphs)
+        helpTrigger = node
+        helpDialog.showModal()
+        helpText.scrollTop = 0
+      }, 'help')
       node.title = title
+      node.ariaLabel = title
+      node.ariaHasPopup = 'dialog'
+      node.setAttribute('aria-controls', helpDialog.id)
       return node
     }
-    const seasonRules = element('div', 'season-rules',
-      ...SEASONS.map((season) => element('p', '', element('b', '', t().seasons[season]), ` — ${t().seasonHints[season]}`)))
-    const beastRules = element('div', 'season-rules', ...t().beastHints.map((hint) => element('p', '', hint)))
-    const rivalRules = element('div', 'season-rules', ...t().rivalHints.map((hint) => element('p', '', hint)))
+    const seasons = settings.season === 'random' ? SEASONS : [settings.season, ...SEASONS.filter((season) => season !== settings.season)]
+    const seasonHelp = help(t().seasonRules,
+      seasons.map((season) => element('p', '', element('b', '', t().seasons[season]), ` — ${t().seasonHints[season]}`)))
+    const beastHelp = help(t().beastRules, t().beastHints.map((hint) => element('p', '', hint)))
+    const rivalHelp = help(t().rivalRules, t().rivalHints.map((hint) => element('p', '', hint)))
     // A smaller map takes fewer rivals: the extra ones are greyed out, and the count shrinks to fit
     const rivals = [1, 2, 3].map((count) => {
       const node = button(String(count), () => choose({ ...settings, rivals: count }))
@@ -310,16 +402,14 @@ export class Screens {
       choiceRow(t().mapSize, MAP_SIZES.map((size) =>
         [t().mapSizes[size], settings.size === size, () =>
           choose({ ...settings, size, rivals: Math.min(settings.rivals, MAX_RIVALS[size]) })])),
-      element('div', 'choice', element('span', 'label', t().rivals, help('rivals', t().rivalRules)), element('div', 'options', ...rivals)),
-      ...(this.helpOpen === 'rivals' ? [rivalRules] : []),
-      choiceRow([t().season, help('season', t().seasonRules)], (['random', ...SEASONS] as const).map((season) =>
+      element('div', 'choice', element('span', 'label', t().rivals, rivalHelp), element('div', 'options', ...rivals)),
+      choiceRow([t().season, seasonHelp], (['random', ...SEASONS] as const).map((season) =>
         [t().seasons[season], settings.season === season, () => choose({ ...settings, season })])),
-      ...(this.helpOpen === 'season' ? [seasonRules] : []),
-      choiceRow([t().beasts, help('beasts', t().beastRules)], BEASTS.map((beasts) =>
+      choiceRow([t().beasts, beastHelp], BEASTS.map((beasts) =>
         [t().beastLevels[beasts], settings.beasts === beasts, () => choose({ ...settings, beasts })])),
-      ...(this.helpOpen === 'beasts' ? [beastRules] : []),
       choiceRow(t().difficulty, DIFFICULTIES.map((difficulty) =>
         [t().difficulties[difficulty], settings.difficulty === difficulty, () => choose({ ...settings, difficulty })])),
+      helpDialog,
     )
   }
 
@@ -334,6 +424,44 @@ export class Screens {
 // The day and the time, as is usual in the language: "14 Nov, 15:30"
 function formatDate(time: number): string {
   return new Date(time).toLocaleString(currentLanguage(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+function resultMatchDetails(time: number, code?: string): HTMLElement {
+  const details = element('div', 'result-meta muted', element('span', '', `${t().matchTime}: ${formatTime(time)}`))
+  if (!code) return details
+
+  const notice = element('p', 'map-code-message')
+  notice.role = 'status'
+  const input = element('input', 'map-code-input')
+  input.value = code
+  input.readOnly = true
+  input.hidden = true
+  input.ariaLabel = t().mapCode
+  const copyLabel = element('span', '', t().mapCode)
+  const copyIcon = icon('copy')
+  copyIcon.ariaHidden = 'true'
+  const copy = button('', async () => {
+    try {
+      await navigator.clipboard.writeText(code)
+      input.hidden = true
+      notice.textContent = ''
+      copyLabel.textContent = t().mapCodeCopied
+      copy.ariaLabel = t().mapCodeCopied
+    } catch {
+      input.hidden = false
+      copyLabel.textContent = t().mapCode
+      copy.ariaLabel = t().copyMapCode
+      notice.textContent = t().mapCodeCopyFailed
+      input.focus()
+      input.select()
+    }
+  }, 'result-link result-copy')
+  copy.append(copyIcon, copyLabel)
+  copy.ariaLabel = t().copyMapCode
+  copy.title = t().copyMapCode
+  copy.setAttribute('aria-live', 'polite')
+  details.append(copy)
+  return element('div', '', details, notice, input)
 }
 
 function settingRow(label: string, control: HTMLElement): HTMLElement {
